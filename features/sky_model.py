@@ -43,30 +43,39 @@ def to_cartesian(spherical_coordinates):
     azimuth = spherical_coordinates[1]
     return np.array((np.sin(altitude) * np.cos(azimuth), np.sin(altitude) * np.sin(azimuth), np.cos(altitude)))
 
+def warn_if_looks_like_degrees(radians):
+    if max(radians) > 2*np.pi:
+       print("It is possible you are passing degrees to a function that expects radians. Radians passed: %s", radians) 
+
 class SkyModel:
     zenith = np.array((np.pi/2, 0))
     antizenith = np.array((-np.pi/2, 0))
-    def __init__(self, sun, observed):
-        input = [sun[0], sun[1], observed[0], observed[1]]
-        if max(map(abs, input)) > 2*np.pi:
-            rad_input = [*map(np.deg2rad, input)]
-            sun = (rad_input[0], rad_input[1])
-            observed = (rad_input[2], rad_input[3])
-        self.sun = np.array(sun)
-        self.observed = np.array(observed)
+
+    def __init__(self):
+        pass
+
+    def with_sun_at_degrees(self, sun_position_degrees):
+        radians = [*map(np.deg2rad,sun_position_degrees)]
+        return self.with_sun_at(radians)
+
+    def with_sun_at(self, sun_position_radians):
+        warn_if_looks_like_degrees(sun_position_radians)
+        self.sun = sun_position_radians
+        return self
 
     # angular distance between the observed pointing and the sun
-    def get_gamma(self):
-       cartesian_sun, cartesian_antizenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.antizenith, self.observed])]
+    def get_gamma(self, point_radians):
+       warn_if_looks_like_degrees(point_radians)
+       cartesian_sun, cartesian_antizenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.antizenith, point_radians])]
        return angle_between(cartesian_sun - cartesian_antizenith, cartesian_observed - cartesian_antizenith)
 
     # the solar zenith distance (90\deg - solar altitude)
     def get_theta_sun(self):
-       return 90 - self.sun[0]
+       return np.pi/2 - self.sun[0]
     
     # the observed zenith distance (90\deg - observed altitude)
-    def get_theta(self):
-       return 90 - self.observed[0]
+    def get_theta(self, point_radians):
+       return np.pi/2 - point_radians[0]
 
 # consult graph https://upload.wikimedia.org/wikipedia/commons/1/17/Rayleigh-geometry.pdf 
 #gamma = 
