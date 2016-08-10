@@ -59,9 +59,14 @@ class SkyModel:
     def get_gamma(self):
        cartesian_sun, cartesian_antizenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.antizenith, self.observed])]
        return angle_between(cartesian_sun - cartesian_antizenith, cartesian_observed - cartesian_antizenith)
+
     # the solar zenith distance (90\deg - solar altitude)
     def get_theta_sun(self):
-        pass
+       return 90 - self.sun[0]
+    
+    # the observed zenith distance (90\deg - observed altitude)
+    def get_theta(self):
+       return 90 - self.observed[0]
 
 # consult graph https://upload.wikimedia.org/wikipedia/commons/1/17/Rayleigh-geometry.pdf 
 #gamma = 
