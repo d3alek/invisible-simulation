@@ -34,5 +34,13 @@ for ax, image in zip(axes.flat, images):
 fig.subplots_adjust(right=0.8)
 cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
 fig.colorbar(im, cax=cbar_ax)
+
+plt.figure()
+
+horizon_degrees = [SkyModel(max_degree=1).with_sun_at_degrees(sun).get_degree((0, azim)) for azim in observed_azimuths]
+plt.plot(horizon_degrees);
+plt.xlabel('Azimuth');
+plt.ylabel('% Polarization on Horizon')
+
 plt.show()
 

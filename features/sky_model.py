@@ -51,8 +51,8 @@ class SkyModel:
     zenith = np.array((np.pi/2, 0))
     antizenith = np.array((-np.pi/2, 0))
 
-    def __init__(self):
-        pass
+    def __init__(self, max_degree = 0.8):
+        self.max_degree = max_degree
 
     def with_sun_at_degrees(self, sun_position_degrees):
         radians = [*map(np.deg2rad,sun_position_degrees)]
@@ -75,19 +75,13 @@ class SkyModel:
     
     # the observed zenith distance (90\deg - observed altitude)
     def get_theta(self, point_radians):
+       warn_if_looks_like_degrees(point_radians)
        return np.pi/2 - point_radians[0]
 
-# consult graph https://upload.wikimedia.org/wikipedia/commons/1/17/Rayleigh-geometry.pdf 
-#gamma = 
-#theta_sun 
-#theta # the angular distance between the observed pointing and the zenith (90\deg - observed_altitude
-#fi # angle between the zenith direction and the solar direction at the observed pointing
-#tao # angle between the solar direction and the observed pointing at the zenith
-
-#degree_max = 1
-#degree = degree_max * sin(gamma)^2 / (1 + cos(gamma)^2)
-
-#TODO reproduce the graphs in the wikipedia article https://en.wikipedia.org/wiki/Rayleigh_sky_model, starting with gamma's altitude-azimuth graph
+    def get_degree(self, point_radians):
+       warn_if_looks_like_degrees(point_radians)
+       gamma = self.get_gamma(point_radians)
+       return self.max_degree * pow(np.sin(gamma), 2) / (1 + pow(np.cos(gamma), 2))
 
 if __name__ == "__main__":
     import doctest
