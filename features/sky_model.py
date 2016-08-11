@@ -67,7 +67,7 @@ class SkyModel:
     def get_gamma(self, point_radians):
        warn_if_looks_like_degrees(point_radians)
        cartesian_sun, cartesian_antizenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.antizenith, point_radians])]
-       return angle_between(cartesian_sun - cartesian_antizenith, cartesian_observed - cartesian_antizenith)
+       return angle_between(cartesian_sun, cartesian_observed)
 
     # the solar zenith distance (90\deg - solar altitude)
     def get_theta_sun(self):

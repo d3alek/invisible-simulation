@@ -13,15 +13,15 @@ Feature: calculating gamma on the horizon
     Scenario: middle gamma
         Given the sun is at east 
         and we look at south 
-        then gamma is 60
+        then gamma is 90
 
     Scenario: middle gamma 2
         Given the sun is at east 
         and we look at north 
-        then gamma is 60
+        then gamma is 90
 
     Scenario: maximum gamma
         Given the sun is at east 
         and we look at west
-        then gamma is 90 
+        then gamma is 180
 

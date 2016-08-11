@@ -9,19 +9,19 @@ Feature: harder gamma tests
     Scenario: medium gamma
         Given the sun is at the zenith 
         and we look at east 
-        then gamma is 45
+        then gamma is 90 
 
     Scenario: medium gamma 2
         Given the sun is at the zenith 
         and we look at west 
-        then gamma is 45
+        then gamma is 90
 
     Scenario: medium gamma 3
         Given the sun is at the zenith 
         and we look at north 
-        then gamma is 45
+        then gamma is 90
 
     Scenario: medium gamma 4
         Given the sun is at the zenith 
         and we look at south 
-        then gamma is 45
+        then gamma is 90
