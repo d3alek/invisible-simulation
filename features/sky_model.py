@@ -49,7 +49,6 @@ def warn_if_looks_like_degrees(radians):
 
 class SkyModel:
     zenith = np.array((np.pi/2, 0))
-    antizenith = np.array((-np.pi/2, 0))
 
     def __init__(self, max_degree = 0.8):
         self.max_degree = max_degree
@@ -66,7 +65,7 @@ class SkyModel:
     # angular distance between the observed pointing and the sun
     def get_gamma(self, point_radians):
        warn_if_looks_like_degrees(point_radians)
-       cartesian_sun, cartesian_antizenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.antizenith, point_radians])]
+       cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, point_radians])]
        return angle_between(cartesian_sun, cartesian_observed)
 
     # the solar zenith distance (90\deg - solar altitude)
@@ -82,6 +81,19 @@ class SkyModel:
        warn_if_looks_like_degrees(point_radians)
        gamma = self.get_gamma(point_radians)
        return self.max_degree * pow(np.sin(gamma), 2) / (1 + pow(np.cos(gamma), 2))
+
+    def get_phi(self, point_radians):
+       warn_if_looks_like_degrees(point_radians)
+       cartesian_sun, cartesian_zenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.zenith, point_radians])]
+       return angle_between(cartesian_sun - cartesian_zenith, cartesian_observed - cartesian_zenith)
+
+    def get_angle(self, point_radians):
+        theta_sun = self.get_theta_sun()
+        theta = self.get_theta(point_radians)
+        gamma = self.get_gamma(point_radians)
+        phi = self.get_phi(point_radians)
+
+        return np.arccos(np.sin(theta_sun)*np.sin(theta)*np.cos(phi) + np.cos(theta_sun)*np.cos(theta))
 
 if __name__ == "__main__":
     import doctest
