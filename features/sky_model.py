@@ -9,7 +9,7 @@ import numpy as np
 
 def unit_vector(vector):
     """ Returns the unit vector of the vector.  """
-    return vector / np.linalg.norm(vector)
+    return vector / np.linalg.norm(vector) 
 
 def angle_between(v1, v2):
     """ Returns the angle in radians between vectors 'v1' and 'v2'::
@@ -85,12 +85,21 @@ class SkyModel:
     def get_phi(self, point_radians):
        warn_if_looks_like_degrees(point_radians)
        cartesian_sun, cartesian_zenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.zenith, point_radians])]
-       return angle_between(cartesian_sun - cartesian_zenith, cartesian_observed - cartesian_zenith)
+       v1 = cartesian_sun - cartesian_zenith
+       v2 = cartesian_observed - cartesian_zenith
+
+       return angle_between(v1, v2)
 
     def get_angle(self, point_radians):
         theta_sun = self.get_theta_sun()
+
         theta = self.get_theta(point_radians)
+
         gamma = self.get_gamma(point_radians)
+
+        if theta_sun == 0:
+           return point_radians[1] - self.sun[1]
+
         phi = self.get_phi(point_radians)
 
         return np.arccos(np.sin(theta_sun)*np.sin(theta)*np.cos(phi) + np.cos(theta_sun)*np.cos(theta))
