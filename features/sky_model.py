@@ -90,19 +90,14 @@ class SkyModel:
 
        return angle_between(v1, v2)
 
+    # http://www.math.ucla.edu/~ronmiech/Calculus_Problems/32A/chap11/section4/708d23/708_23.html
     def get_angle(self, point_radians):
-        theta_sun = self.get_theta_sun()
-
-        theta = self.get_theta(point_radians)
-
-        gamma = self.get_gamma(point_radians)
-
-        if theta_sun == 0:
-           return point_radians[1] - self.sun[1]
-
-        phi = self.get_phi(point_radians)
-
-        return np.arccos(np.sin(theta_sun)*np.sin(theta)*np.cos(phi) + np.cos(theta_sun)*np.cos(theta))
+        cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, point_radians])]
+        orthogonal = np.cross(cartesian_sun, cartesian_observed)
+        angle = np.arctan2(orthogonal[2], orthogonal[0])
+        if angle < 0:
+            angle += np.pi
+        return angle
 
 if __name__ == "__main__":
     import doctest

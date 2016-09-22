@@ -13,27 +13,27 @@ Feature: angle of polarization
         and the sun is at east 
         and we look at the horizon
         and we look at south
-        then angle is 60
+        then angle is vertical
 
     Scenario: angle goes from 0 to 90 on horizon at sunrise 3
         Given the sun is at the horizon 
         and the sun is at east 
         and we look at the horizon
         and we look at west 
-        then angle is vertical
+        then angle is horizontal
 
     Scenario: vertical at zenith on sunrise when looking south
         Given the sun is at the horizon 
         and the sun is at east 
         and we look at the zenith 
         and we look at south
-        then angle is vertical 
+        then angle is vertical
 
     Scenario: horizontal at zenith on sunrise when looking east
         Given the sun is at the horizon 
         and the sun is at east 
         and we look at the zenith 
-        and we look at east 
+        and we look at south
         then angle is horizontal
 
     Scenario: horizontal at horizon at noon when looking east

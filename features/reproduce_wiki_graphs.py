@@ -1,3 +1,4 @@
+import sky_model
 from sky_model import SkyModel
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
@@ -8,7 +9,7 @@ import ipdb
 
 # Reproduces graph https://en.wikipedia.org/wiki/Rayleigh_sky_model#/media/File:Soldis_zendis.jpg
 
-sun = (0, 3*np.pi/2) # setting to the west
+sun = (0, np.pi) # setting to the west
 
 one_degree_in_radians = np.pi/180
 observed_altitudes = np.arange(np.pi/2, step=one_degree_in_radians)
@@ -48,25 +49,32 @@ def matrix_from_func(func):
 #plt.show()
 #
 
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
+for sun in [(0, 0), (np.pi/3, np.pi/3), (2*np.pi/5, np.pi/2), (np.pi/3, 2*np.pi/3), (0, np.pi)]:
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
 
-azimuths, altitudes = np.meshgrid(observed_azimuths, observed_altitudes)
-x = np.cos(azimuths) * np.sin(altitudes)
-y = np.sin(azimuths) * np.sin(altitudes)
-z = np.cos(altitudes)
+    azimuths, altitudes = np.meshgrid(observed_azimuths, observed_altitudes)
+    x = np.cos(azimuths) * np.sin(altitudes)
+    y = np.sin(azimuths) * np.sin(altitudes)
+    z = np.cos(altitudes)
 
-colors = np.empty(azimuths.shape)
+    colors = np.empty(azimuths.shape)
 
-for azimuth_index, azimuth in enumerate(observed_azimuths):
-    for altitude_index, altitude in enumerate(observed_altitudes):
-        colors[altitude_index, azimuth_index] = SkyModel().with_sun_at(sun).get_angle((altitude, azimuth)) 
+    for azimuth_index, azimuth in enumerate(observed_azimuths):
+        for altitude_index, altitude in enumerate(observed_altitudes):
+            colors[altitude_index, azimuth_index] = SkyModel().with_sun_at(sun).get_angle((altitude, azimuth)) 
 
-normalized_colors = cm.hsv(colors/np.max(colors))
-ax.plot_surface(x, y, z, facecolors = normalized_colors, alpha = 0.9, linewidth=0)
+    colormap = cm.jet #TODO do not use jet, see https://jakevdp.github.io/blog/2014/10/16/how-bad-is-your-colormap/, maybe cubehelix
+    normalized_colors = colors/np.max(colors)
+    p = ax.plot_surface(x, y, z, facecolors = colormap(normalized_colors), alpha = 0.9, linewidth=0)
 
-sun_x, sun_y, sun_z = np.sin(sun[1]), np.cos(sun[1]), np.sin(sun[0])
-ax.scatter([sun_x],[sun_y],[sun_z],color="y",s=1000)
+    m = cm.ScalarMappable(cmap=colormap)
+    m.set_array(normalized_colors)
+    plt.colorbar(m)
 
-plt.show()
+    sun_x, sun_y, sun_z = sky_model.to_cartesian(sun)
+    #TODO seems necessary to invert z. 
+    ax.scatter([sun_x],[sun_y],[-sun_z],color="y",s=1000)
+
+    plt.show()
 
