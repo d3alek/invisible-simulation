@@ -11,7 +11,7 @@ import ipdb
 
 sun = (0, 3*np.pi/2) # setting to the west
 
-one_degree_in_radians = np.pi/180
+one_degree_in_radians = 7*np.pi/180
 observed_altitudes = np.arange(np.pi/2, step=one_degree_in_radians)
 observed_azimuths = np.arange(2*np.pi, step=one_degree_in_radians)
 
@@ -49,7 +49,7 @@ def matrix_from_func(func):
 #plt.show()
 #
 
-for sun in [(0, np.pi/2), (np.pi/2, np.pi), (0, 3*np.pi/2)]:
+for sun in [(0, np.pi/2), (np.pi/2 - 0.8, np.pi)]:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
@@ -58,22 +58,17 @@ for sun in [(0, np.pi/2), (np.pi/2, np.pi), (0, 3*np.pi/2)]:
     y = np.sin(azimuths) * np.sin(altitudes)
     z = np.cos(altitudes)
 
-    colors = np.empty(azimuths.shape)
+    u, v, w = np.empty(azimuths.shape), np.empty(azimuths.shape), np.empty(azimuths.shape)
 
     for azimuth_index, azimuth in enumerate(observed_azimuths):
         for altitude_index, altitude in enumerate(observed_altitudes):
-            colors[altitude_index, azimuth_index] = SkyModel().with_sun_at(sun).get_angle((altitude, azimuth)) 
+            u[altitude_index, azimuth_index], v[altitude_index, azimuth_index], w[altitude_index, azimuth_index] = SkyModel().with_sun_at(sun).get_angle_vector((altitude, azimuth)) 
 
-    colormap = cm.jet #TODO do not use jet, see https://jakevdp.github.io/blog/2014/10/16/how-bad-is-your-colormap/, maybe cubehelix
-    normalized_colors = colors/np.max(colors)
-    p = ax.plot_surface(x, y, z, facecolors = colormap(normalized_colors), alpha = 0.9, linewidth=0)
+    ax.quiver(x, y, z, u, v, w, length=0.1)
+
     ax.set_xlabel('x');
     ax.set_ylabel('y')
     ax.set_zlabel('z')
-
-    m = cm.ScalarMappable(cmap=colormap)
-    m.set_array(normalized_colors)
-    plt.colorbar(m)
 
     sun_x, sun_y, sun_z = sky_model.to_cartesian(sun)
 

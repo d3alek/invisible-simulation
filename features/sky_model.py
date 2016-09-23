@@ -105,6 +105,15 @@ class SkyModel:
         if angle < 0:
             angle += np.pi
         return angle
+    
+    # useful for 3d plotting
+    def get_angle_vector(self, point_radians):
+        cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, point_radians])]
+        orthogonal = np.cross(cartesian_sun, cartesian_observed)
+        if np.isclose(np.linalg.norm(orthogonal), 0):
+            return (1, 0, 0)
+
+        return unit_vector(orthogonal)
 
 if __name__ == "__main__":
     import doctest
