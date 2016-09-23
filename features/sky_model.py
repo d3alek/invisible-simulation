@@ -25,15 +25,19 @@ def angle_between(v1, v2):
     v2_u = unit_vector(v2)
     return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
 
+
 def round_print(a):
-    return print(np.round(a,1))
+    to_print = np.round(a,1)
+    to_print[to_print==0.] = 0. # to remove -0.
+    return print(to_print)
+
 def to_cartesian(spherical_coordinates):
     """ altitude goes (-90;90) in rest of the program so add 90\deg to it. 
 
-    >>> round_print(np.round(to_cartesian((np.pi/2, 0)), 1))
-    [ 0.  0. -1.]
-    >>> round_print(to_cartesian((-np.pi/2, 0)))
+    >>> round_print(to_cartesian((np.pi/2, 0)))
     [ 0.  0.  1.]
+    >>> round_print(to_cartesian((-np.pi/2, 0)))
+    [ 0.  0. -1.]
     >>> round_print(to_cartesian((0, np.pi/2)))
     [ 0.  1.  0.]
     >>> round_print(to_cartesian((0, 0)))
@@ -41,7 +45,7 @@ def to_cartesian(spherical_coordinates):
     """
     altitude = spherical_coordinates[0] + np.pi/2
     azimuth = spherical_coordinates[1]
-    return np.array((np.sin(altitude) * np.cos(azimuth), np.sin(altitude) * np.sin(azimuth), np.cos(altitude)))
+    return np.array((np.sin(altitude) * np.cos(azimuth), np.sin(altitude) * np.sin(azimuth), -np.cos(altitude)))
 
 def warn_if_looks_like_degrees(radians):
     if max(radians) > 2*np.pi:
@@ -94,6 +98,9 @@ class SkyModel:
     def get_angle(self, point_radians):
         cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, point_radians])]
         orthogonal = np.cross(cartesian_sun, cartesian_observed)
+        if np.isclose(np.linalg.norm(orthogonal), 0):
+            return 0
+
         angle = np.arctan2(orthogonal[2], orthogonal[0])
         if angle < 0:
             angle += np.pi
