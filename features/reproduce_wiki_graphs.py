@@ -1,5 +1,5 @@
 import sky_model
-from sky_model import SkyModel
+from sky_model import SkyModelGenerator
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib as mpl
@@ -11,7 +11,7 @@ import ipdb
 
 sun = (0, 3*np.pi/2) # setting to the west
 
-one_degree_in_radians = 7*np.pi/180
+one_degree_in_radians = np.pi/180
 observed_altitudes = np.arange(np.pi/2, step=one_degree_in_radians)
 observed_azimuths = np.arange(2*np.pi, step=one_degree_in_radians)
 
@@ -22,49 +22,45 @@ def matrix_from_func(func):
 
     return np.array(rows)
 
-#gamma_func = lambda alt, azim: np.rad2deg(SkyModel().with_sun_at(sun).get_gamma((alt, azim)))
-#gamma_image = matrix_from_func(gamma_func)
-#
-#theta_func = lambda alt, azim: np.rad2deg(SkyModel().with_sun_at(sun).get_theta((alt, azim)))
-#theta_image = matrix_from_func(theta_func)
-#
-#images = [gamma_image, theta_image]
-#
-#fig, axes = plt.subplots(nrows=2, ncols=1)
-#for ax, image in zip(axes.flat, images):
-#    im = ax.pcolor(image)
-#    ax.axis([0, 90, 0, 360])
-#
-#fig.subplots_adjust(right=0.8)
-#cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-#fig.colorbar(im, cax=cbar_ax)
-#
-#plt.figure()
-#
-#horizon_degrees = [SkyModel(max_degree=1).with_sun_at(sun).get_degree((0, azim)) for azim in observed_azimuths]
-#plt.plot(horizon_degrees);
-#plt.xlabel('Azimuth');
-#plt.ylabel('% Polarization on Horizon')
-#
-#plt.show()
-#
+gamma_func = lambda alt, azim: np.rad2deg(SkyModelGenerator().with_sun_at(sun).get_gamma((alt, azim)))
+gamma_image = matrix_from_func(gamma_func)
 
-for sun in [(0, np.pi/2), (np.pi/2 - 0.8, np.pi)]:
+theta_func = lambda alt, azim: np.rad2deg(SkyModelGenerator().with_sun_at(sun).get_theta((alt, azim)))
+theta_image = matrix_from_func(theta_func)
+
+images = [gamma_image, theta_image]
+
+fig, axes = plt.subplots(nrows=2, ncols=1)
+for ax, image in zip(axes.flat, images):
+    im = ax.pcolor(image)
+    ax.axis([0, 90, 0, 360])
+
+fig.subplots_adjust(right=0.8)
+cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+fig.colorbar(im, cax=cbar_ax)
+
+plt.figure()
+
+horizon_degrees = [SkyModelGenerator(max_degree=1).with_sun_at(sun).get_degree((0, azim)) for azim in observed_azimuths]
+plt.plot(horizon_degrees);
+plt.xlabel('Azimuth');
+plt.ylabel('% Polarization on Horizon')
+
+plt.show()
+
+
+for sun in [(np.pi/2 - 0.8, np.pi)]:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    azimuths, altitudes = np.meshgrid(observed_azimuths, observed_altitudes)
-    x = np.cos(azimuths) * np.sin(altitudes)
-    y = np.sin(azimuths) * np.sin(altitudes)
-    z = np.cos(altitudes)
+    sm = SkyModelGenerator().with_sun_at(sun).generate()
 
-    u, v, w = np.empty(azimuths.shape), np.empty(azimuths.shape), np.empty(azimuths.shape)
+    u, v, w = np.empty(sm.angle_vectors.shape), np.empty(sm.angle_vectors.shape), np.empty(sm.angle_vectors.shape)
 
-    for azimuth_index, azimuth in enumerate(observed_azimuths):
-        for altitude_index, altitude in enumerate(observed_altitudes):
-            u[altitude_index, azimuth_index], v[altitude_index, azimuth_index], w[altitude_index, azimuth_index] = SkyModel().with_sun_at(sun).get_angle_vector((altitude, azimuth)) 
+    for index, angle_vector in enumerate(sm.angle_vectors.flat):
+            u.flat[index], v.flat[index], w.flat[index] = angle_vector
 
-    ax.quiver(x, y, z, u, v, w, length=0.1)
+    ax.quiver(sm.x, sm.y, sm.z, u, v, w, length=0.1)
 
     ax.set_xlabel('x');
     ax.set_ylabel('y')

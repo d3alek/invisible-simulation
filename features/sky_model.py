@@ -51,7 +51,7 @@ def warn_if_looks_like_degrees(radians):
     if max(radians) > 2*np.pi:
        print("It is possible you are passing degrees to a function that expects radians. Radians passed: %s", radians) 
 
-class SkyModel:
+class SkyModelGenerator:
     zenith = np.array((np.pi/2, 0))
 
     def __init__(self, max_degree = 0.8):
@@ -114,6 +114,34 @@ class SkyModel:
             return (1, 0, 0)
 
         return unit_vector(orthogonal)
+
+    def generate(self):
+        seven_degrees_in_radians = 7*np.pi/180
+        observed_altitudes = np.arange(np.pi/2, step=seven_degrees_in_radians)
+        observed_azimuths = np.arange(2*np.pi, step=seven_degrees_in_radians)
+
+        azimuths, altitudes = np.meshgrid(observed_azimuths, observed_altitudes)
+        x = np.cos(azimuths) * np.sin(altitudes)
+        y = np.sin(azimuths) * np.sin(altitudes)
+        z = np.cos(altitudes)
+
+        angle_vectors = np.empty(azimuths.shape, dtype=list)
+
+        for azimuth_index, azimuth in enumerate(observed_azimuths):
+            for altitude_index, altitude in enumerate(observed_altitudes):
+                angle_vectors[altitude_index, azimuth_index] = self.get_angle_vector((altitude, azimuth)) 
+
+        return SkyModel(observed_azimuths, observed_altitudes, x, y, z, angle_vectors)
+
+class SkyModel:
+    def __init__(self, observed_azimuths, observed_altitudes, x, y, z, angle_vectors):
+        self.observed_azimuths = observed_azimuths
+        self.observed_altitudes = observed_altitudes
+        self.x = x
+        self.y = y
+        self.z = z
+        self.angle_vectors = angle_vectors
+
 
 if __name__ == "__main__":
     import doctest
