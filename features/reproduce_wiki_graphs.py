@@ -49,7 +49,7 @@ plt.ylabel('% Polarization on Horizon')
 plt.show()
 
 
-for sun in [(np.pi/2 - 0.8, np.pi)]:
+for sun in [(0, np.pi/2)]:#[(np.pi/2 - 0.8, np.pi)]:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 

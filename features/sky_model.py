@@ -7,6 +7,10 @@ import numpy as np
 # To calculate the sun position changing during the day (altitude, azimuth), use https://en.wikipedia.org/wiki/Solar_zenith_angle https://en.wikipedia.org/wiki/Solar_azimuth_angle 
 # or better yet, use https://pysolar.readthedocs.io/en/latest/ which takes longitude and latitude and time and gives you the altitude and azumith (take into account they take south as 0 for azimuth, with positive going towards east)
 
+seven_degrees_in_radians = 7*np.pi/180
+DEFAULT_OBSERVED_ALTITUDES = np.arange(np.pi/2, step=seven_degrees_in_radians)
+DEFAULT_OBSERVED_AZIMUTHS = np.arange(2*np.pi, step=seven_degrees_in_radians)
+
 def unit_vector(vector):
     """ Returns the unit vector of the vector.  """
     return vector / np.linalg.norm(vector) 
@@ -115,31 +119,30 @@ class SkyModelGenerator:
 
         return unit_vector(orthogonal)
 
-    def generate(self):
-        seven_degrees_in_radians = 7*np.pi/180
-        observed_altitudes = np.arange(np.pi/2, step=seven_degrees_in_radians)
-        observed_azimuths = np.arange(2*np.pi, step=seven_degrees_in_radians)
-
+    def generate(self, observed_altitudes = DEFAULT_OBSERVED_ALTITUDES, observed_azimuths = DEFAULT_OBSERVED_AZIMUTHS):
         azimuths, altitudes = np.meshgrid(observed_azimuths, observed_altitudes)
         x = np.cos(azimuths) * np.sin(altitudes)
         y = np.sin(azimuths) * np.sin(altitudes)
         z = np.cos(altitudes)
 
         angle_vectors = np.empty(azimuths.shape, dtype=list)
+        angles = np.empty(azimuths.shape)
 
         for azimuth_index, azimuth in enumerate(observed_azimuths):
             for altitude_index, altitude in enumerate(observed_altitudes):
                 angle_vectors[altitude_index, azimuth_index] = self.get_angle_vector((altitude, azimuth)) 
+                angles[altitude_index, azimuth_index] = self.get_angle((altitude, azimuth)) 
 
-        return SkyModel(observed_azimuths, observed_altitudes, x, y, z, angle_vectors)
+        return SkyModel(observed_azimuths, observed_altitudes, x, y, z, angles, angle_vectors)
 
 class SkyModel:
-    def __init__(self, observed_azimuths, observed_altitudes, x, y, z, angle_vectors):
+    def __init__(self, observed_azimuths, observed_altitudes, x, y, z, angles, angle_vectors):
         self.observed_azimuths = observed_azimuths
         self.observed_altitudes = observed_altitudes
         self.x = x
         self.y = y
         self.z = z
+        self.angles = angles
         self.angle_vectors = angle_vectors
 
 
