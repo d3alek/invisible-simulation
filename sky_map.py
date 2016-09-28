@@ -10,6 +10,9 @@ import numpy as np
 from pygame.locals import *
 import ipdb
 
+from pysolar.solar import *
+import datetime
+
 pygame.init()
 fpsClock = pygame.time.Clock()
 
@@ -50,7 +53,9 @@ def altitude_to_radius(altitude):
 observed_altitudes = np.array([*map(radius_to_altitude, observed_radii)])
 
 def sky_model_cartesian_to_sky_map_cartesian(sky_model_cartesian):
-    return sky_model_cartesian[:2][::-1]
+    y, x = sky_model_cartesian[:2]
+
+    return x, -y # need to invert y otherwise the azimuth rotates the wrong way (visible from the sun rotation)
 
 def cartesian2d(polar):
     cartesian = sky_model_cartesian_to_sky_map_cartesian(to_cartesian(polar))
@@ -72,6 +77,27 @@ def draw_angles():
             pos = cartesian2d((altitude, azimuth))
             drawArrow(sky_model.angles[index_altitude, index_azimuth], pos)
 
+date = datetime.date.today()
+def calculate_sunrise_sunset_times():
+    times = datetime.time(8, 0), datetime.time(18, 0)
+    return [*map(lambda a: datetime.datetime.combine(date, a), times)]
+
+def pysolar_to_local(pysolar_position):
+    altitude, azimuth = pysolar_position
+    return np.deg2rad(altitude), np.deg2rad((-azimuth + 180) % 360)
+
+def sun_position(datetime):
+    return pysolar_to_local((get_altitude(37.366123, -5.996422, datetime), get_azimuth(37.366123, -5.996422, datetime)))
+
+sunrise_time, sunset_time = calculate_sunrise_sunset_times()
+day_length = sunset_time - sunrise_time
+hours = day_length.seconds/(3600)
+minutes = (day_length.seconds%(3600))/60
+print("Day length is %d:%02d hours" % (hours, minutes))
+
+sun_at = sun_position(sunrise_time)
+mouse_down = False
+
 while True:
     windowSurfaceObj.fill(blackColor)
 
@@ -79,11 +105,24 @@ while True:
         if event.type == QUIT:
             pygame.quit()
             sys.exit()
+        elif event.type == MOUSEBUTTONDOWN:
+            mouse_down = True
+        elif event.type == MOUSEBUTTONUP:
+            mouse_down = False
+        elif event.type == MOUSEMOTION:
+            mousex, mousey = event.pos
+            if mouse_down:
+                ratio = 1 - mousex/WIDTH
+                sun_at = sun_position(sunrise_time + day_length * ratio)
+                print(sun_at)
+
         elif event.type == KEYDOWN:
             if event.key == K_ESCAPE:
                 pygame.event.post(pygame.event.Event(QUIT))
 
     draw_angles()
+
+    #TODO sun_motion()
 
     draw_sun()
     pygame.display.update()
