@@ -53,7 +53,7 @@ def to_cartesian(spherical_coordinates):
 
 def warn_if_looks_like_degrees(radians):
     if max(radians) > 2*np.pi:
-       print("It is possible you are passing degrees to a function that expects radians. Radians passed: %s", radians) 
+       print("It is possible you are passing degrees to a function that expects radians. Radians passed: ", radians) 
 
 class SkyModelGenerator:
     zenith = np.array((np.pi/2, 0))
