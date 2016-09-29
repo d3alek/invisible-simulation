@@ -99,6 +99,27 @@ print("Day length is %d:%02d hours" % (hours, minutes))
 sun_at = sun_position(sunrise_time)
 mouse_down = False
 
+date = datetime.date.today()
+def calculate_sunrise_sunset_times():
+    times = datetime.time(8, 0), datetime.time(18, 0)
+    return [*map(lambda a: datetime.datetime.combine(date, a), times)]
+
+def pysolar_to_local(pysolar_position):
+    altitude, azimuth = pysolar_position
+    return np.deg2rad(altitude), np.deg2rad((-azimuth + 180) % 360)
+
+def sun_position(datetime):
+    return pysolar_to_local((get_altitude(37.366123, -5.996422, datetime), get_azimuth(37.366123, -5.996422, datetime)))
+
+sunrise_time, sunset_time = calculate_sunrise_sunset_times()
+day_length = sunset_time - sunrise_time
+hours = day_length.seconds/(3600)
+minutes = (day_length.seconds%(3600))/60
+print("Day length is %d:%02d hours" % (hours, minutes))
+
+sun_at = sun_position(sunrise_time)
+mouse_down = False
+
 while True:
     windowSurfaceObj.fill(blackColor)
 
@@ -121,8 +142,6 @@ while True:
                 pygame.event.post(pygame.event.Event(QUIT))
 
     draw_angles()
-
-    #TODO sun_motion()
 
     draw_sun()
     pygame.display.update()
