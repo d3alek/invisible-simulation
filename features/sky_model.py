@@ -127,16 +127,18 @@ class SkyModelGenerator:
 
         angle_vectors = np.empty(azimuths.shape, dtype=list)
         angles = np.empty(azimuths.shape)
+        degrees = np.empty(azimuths.shape)
 
         for azimuth_index, azimuth in enumerate(observed_azimuths):
             for altitude_index, altitude in enumerate(observed_altitudes):
                 angle_vectors[altitude_index, azimuth_index] = self.get_angle_vector((altitude, azimuth)) 
                 angles[altitude_index, azimuth_index] = self.get_angle((altitude, azimuth)) 
+                degrees[altitude_index, azimuth_index] = self.get_degree((altitude, azimuth))
 
-        return SkyModel(observed_azimuths, observed_altitudes, x, y, z, angles, angle_vectors)
+        return SkyModel(observed_azimuths, observed_altitudes, x, y, z, angles, angle_vectors, degrees)
 
 class SkyModel:
-    def __init__(self, observed_azimuths, observed_altitudes, x, y, z, angles, angle_vectors):
+    def __init__(self, observed_azimuths, observed_altitudes, x, y, z, angles, angle_vectors, degrees):
         self.observed_azimuths = observed_azimuths
         self.observed_altitudes = observed_altitudes
         self.x = x
@@ -144,6 +146,7 @@ class SkyModel:
         self.z = z
         self.angles = angles
         self.angle_vectors = angle_vectors
+        self.degrees = degrees
 
 
 if __name__ == "__main__":
