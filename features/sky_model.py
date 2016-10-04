@@ -4,9 +4,6 @@ import numpy as np
 # - altitude - elevation (0-90)
 # - azimuth - angle of the object around the horizon, from north increasing towards east
 
-# To calculate the sun position changing during the day (altitude, azimuth), use https://en.wikipedia.org/wiki/Solar_zenith_angle https://en.wikipedia.org/wiki/Solar_azimuth_angle 
-# or better yet, use https://pysolar.readthedocs.io/en/latest/ which takes longitude and latitude and time and gives you the altitude and azumith (take into account they take south as 0 for azimuth, with positive going towards east)
-
 seven_degrees_in_radians = 7*np.pi/180
 DEFAULT_OBSERVED_ALTITUDES = np.arange(np.pi/2, step=seven_degrees_in_radians)
 DEFAULT_OBSERVED_AZIMUTHS = np.arange(2*np.pi, step=seven_degrees_in_radians)
@@ -70,42 +67,38 @@ class SkyModelGenerator:
         self.sun = sun_position_radians
         return self
 
-    # angular distance between the observed pointing and the sun
     def get_gamma(self, point_radians):
-       warn_if_looks_like_degrees(point_radians)
-       cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, point_radians])]
-       return angle_between(cartesian_sun, cartesian_observed)
+        """ Angular distance between the observed pointing and the sun """
+        warn_if_looks_like_degrees(point_radians)
+        cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, point_radians])]
+        return angle_between(cartesian_sun, cartesian_observed)
 
-    # the solar zenith distance (90\deg - solar altitude)
     def get_theta_sun(self):
-       return np.pi/2 - self.sun[0]
+        """ The solar zenith distance (90\deg - solar altitude) """
+        return np.pi/2 - self.sun[0]
     
-    # the observed zenith distance (90\deg - observed altitude)
     def get_theta(self, point_radians):
-       warn_if_looks_like_degrees(point_radians)
-       return np.pi/2 - point_radians[0]
+        """ The observed zenith distance (90\deg - observed altitude) """
+        warn_if_looks_like_degrees(point_radians)
+        return np.pi/2 - point_radians[0]
 
     def get_degree(self, point_radians):
-       warn_if_looks_like_degrees(point_radians)
-       gamma = self.get_gamma(point_radians)
-       return self.max_degree * pow(np.sin(gamma), 2) / (1 + pow(np.cos(gamma), 2))
+        warn_if_looks_like_degrees(point_radians)
+        gamma = self.get_gamma(point_radians)
+        return self.max_degree * pow(np.sin(gamma), 2) / (1 + pow(np.cos(gamma), 2))
 
     def get_phi(self, point_radians):
-       warn_if_looks_like_degrees(point_radians)
-       cartesian_sun, cartesian_zenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.zenith, point_radians])]
-       v1 = cartesian_sun - cartesian_zenith
-       v2 = cartesian_observed - cartesian_zenith
+        warn_if_looks_like_degrees(point_radians)
+        cartesian_sun, cartesian_zenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.zenith, point_radians])]
+        v1 = cartesian_sun - cartesian_zenith
+        v2 = cartesian_observed - cartesian_zenith
 
-       return angle_between(v1, v2)
+        return angle_between(v1, v2)
 
     # http://www.math.ucla.edu/~ronmiech/Calculus_Problems/32A/chap11/section4/708d23/708_23.html
     def get_angle(self, point_radians):
-        cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, point_radians])]
-        orthogonal = np.cross(cartesian_sun, cartesian_observed)
-        if np.isclose(np.linalg.norm(orthogonal), 0):
-            return 0
-
-        angle = np.arctan2(orthogonal[2], orthogonal[0])
+        angle_vector = self.get_angle_vector(point_radians)
+        angle = np.arctan2(angle_vector[2], angle_vector[0])
         if angle < 0:
             angle += np.pi
         return angle
@@ -117,13 +110,16 @@ class SkyModelGenerator:
         if np.isclose(np.linalg.norm(orthogonal), 0):
             return (1, 0, 0)
 
-        return unit_vector(orthogonal)
+        return orthogonal
 
     def generate(self, observed_altitudes = DEFAULT_OBSERVED_ALTITUDES, observed_azimuths = DEFAULT_OBSERVED_AZIMUTHS):
         azimuths, altitudes = np.meshgrid(observed_azimuths, observed_altitudes)
-        x = np.cos(azimuths) * np.sin(altitudes)
-        y = np.sin(azimuths) * np.sin(altitudes)
-        z = np.cos(altitudes)
+
+        cartesian = map(to_cartesian, zip(altitudes, azimuths))
+
+        #x = np.cos(azimuths) * np.sin(altitudes)
+        #y = np.sin(azimuths) * np.sin(altitudes)
+        #z = np.cos(altitudes)
 
         angle_vectors = np.empty(azimuths.shape, dtype=list)
         angles = np.empty(azimuths.shape)
@@ -135,6 +131,7 @@ class SkyModelGenerator:
                 angles[altitude_index, azimuth_index] = self.get_angle((altitude, azimuth)) 
                 degrees[altitude_index, azimuth_index] = self.get_degree((altitude, azimuth))
 
+        x, y, z = zip(*cartesian)
         return SkyModel(observed_azimuths, observed_altitudes, x, y, z, angles, angle_vectors, degrees)
 
 class SkyModel:

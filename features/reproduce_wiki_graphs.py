@@ -9,7 +9,9 @@ import ipdb
 
 # Reproduces graph https://en.wikipedia.org/wiki/Rayleigh_sky_model#/media/File:Soldis_zendis.jpg
 
-sun = (0, 3*np.pi/2) # setting to the west
+EAST = (0, np.pi/2)
+WEST = (0, 3*np.pi/2)
+sun = WEST # setting to the west
 
 one_degree_in_radians = np.pi/180
 observed_altitudes = np.arange(np.pi/2, step=one_degree_in_radians)
@@ -49,7 +51,7 @@ plt.ylabel('% Polarization on Horizon')
 plt.show()
 
 
-for sun in [(0, np.pi/2)]:#[(np.pi/2 - 0.8, np.pi)]:
+for sun in [EAST, (np.pi/2 - 0.8, np.pi), WEST]:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
