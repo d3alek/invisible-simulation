@@ -1,4 +1,5 @@
 import numpy as np
+import ipdb
 # using the horizontal celestrial coordinate system https://en.wikipedia.org/wiki/Horizontal_coordinate_system
 # this means we have two coordinates: 
 # - altitude - elevation (0-90)
@@ -52,6 +53,37 @@ def warn_if_looks_like_degrees(radians):
     if max(radians) > 2*np.pi:
        print("It is possible you are passing degrees to a function that expects radians. Radians passed: ", radians) 
 
+def project(vector, plane_normal):
+    """ Projects a vector onto a plane given by its normal
+    http://www.euclideanspace.com/maths/geometry/elements/plane/lineOnPlane/
+
+    >>> round_print(project([1, 1, 0], [0, 0, 1]))
+    [ 1.  1.  0.]
+    >>> round_print(project([1, 0, 0], [1, 0, 0]))
+    [ 0.  0.  0.]
+    >>> round_print(project([1, 1, 0], [1, 0, 0]))
+    [ 0.  1.  0.]
+    >>> round_print(project([1, 0, 0], [0, 1, 1]))
+    [ 1.  0.  0.]
+    """
+    plane_normal = unit_vector(plane_normal)
+    return np.cross(np.cross(plane_normal, vector), plane_normal)
+
+def rotation_matrix(axis, theta):
+    """
+    Return the rotation matrix associated with counterclockwise rotation about
+    the given axis by theta radians.
+    """
+    axis = np.asarray(axis)
+    axis = axis/np.sqrt(np.dot(axis, axis))
+    a = np.cos(theta/2.0)
+    b, c, d = -axis*np.sin(theta/2.0)
+    aa, bb, cc, dd = a*a, b*b, c*c, d*d
+    bc, ad, ac, ab, bd, cd = b*c, a*d, a*c, a*b, b*d, c*d
+    return np.array([[aa+bb-cc-dd, 2*(bc+ad), 2*(bd-ac)],
+                     [2*(bc-ad), aa+cc-bb-dd, 2*(cd+ab)],
+                     [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
+
 class SkyModelGenerator:
     zenith = np.array((np.pi/2, 0))
 
@@ -96,11 +128,33 @@ class SkyModelGenerator:
         return angle_between(v1, v2)
 
     # http://www.math.ucla.edu/~ronmiech/Calculus_Problems/32A/chap11/section4/708d23/708_23.html
+
     def get_angle(self, point_radians):
         angle_vector = self.get_angle_vector(point_radians)
-        angle = np.arctan2(angle_vector[2], angle_vector[0])
+
+        cartesian_observed = to_cartesian(point_radians)
+        tangent_plane_normal = unit_vector(cartesian_observed)
+        projected_angle_vector = project(angle_vector, tangent_plane_normal)
+        
+        # following http://stackoverflow.com/questions/6802577/python-rotation-of-3d-vector
+	
+        normal = (0, 0, 1)
+        rotation_axis = np.cross(normal, tangent_plane_normal)
+        matrix = rotation_matrix(rotation_axis, angle_between(tangent_plane_normal, normal))
+        assert np.allclose(np.dot(tangent_plane_normal, matrix), normal)
+
+        rotated_angle_vector = np.dot(projected_angle_vector, matrix)
+
+        #angle = np.arctan2(rotated_angle_vector[1], rotated_angle_vector[0])
+        angle = angle_between(rotated_angle_vector, (1, 0, 0))
         if angle < 0:
             angle += np.pi
+
+        if angle > 180:
+            angle -= np.pi/2
+
+        assert angle >= 0 and angle <= 180
+
         return angle
     
     # useful for 3d plotting
@@ -116,10 +170,6 @@ class SkyModelGenerator:
         azimuths, altitudes = np.meshgrid(observed_azimuths, observed_altitudes)
 
         cartesian = map(to_cartesian, zip(altitudes, azimuths))
-
-        #x = np.cos(azimuths) * np.sin(altitudes)
-        #y = np.sin(azimuths) * np.sin(altitudes)
-        #z = np.cos(altitudes)
 
         angle_vectors = np.empty(azimuths.shape, dtype=list)
         angles = np.empty(azimuths.shape)
