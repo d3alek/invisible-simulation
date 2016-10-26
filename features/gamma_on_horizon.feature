@@ -2,8 +2,8 @@ Feature: calculating gamma on the horizon
 	This is the angular distance between the observed pointing and the sun
 
 	Background: assume sun and observed pointing are at the horizon
-		Given we look at the horizon
-		and the sun is at the horizon
+		Given we look at altitude horizon
+		and the sun is at altitude horizon
 
     Scenario: zero gamma
         Given the sun is at east 

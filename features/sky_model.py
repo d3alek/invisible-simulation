@@ -53,37 +53,6 @@ def warn_if_looks_like_degrees(radians):
     if max(radians) > 2*np.pi:
        print("It is possible you are passing degrees to a function that expects radians. Radians passed: ", radians) 
 
-def project(vector, plane_normal):
-    """ Projects a vector onto a plane given by its normal
-    http://www.euclideanspace.com/maths/geometry/elements/plane/lineOnPlane/
-
-    >>> round_print(project([1, 1, 0], [0, 0, 1]))
-    [ 1.  1.  0.]
-    >>> round_print(project([1, 0, 0], [1, 0, 0]))
-    [ 0.  0.  0.]
-    >>> round_print(project([1, 1, 0], [1, 0, 0]))
-    [ 0.  1.  0.]
-    >>> round_print(project([1, 0, 0], [0, 1, 1]))
-    [ 1.  0.  0.]
-    """
-    plane_normal = unit_vector(plane_normal)
-    return np.cross(np.cross(plane_normal, vector), plane_normal)
-
-def rotation_matrix(axis, theta):
-    """
-    Return the rotation matrix associated with counterclockwise rotation about
-    the given axis by theta radians.
-    """
-    axis = np.asarray(axis)
-    axis = axis/np.sqrt(np.dot(axis, axis))
-    a = np.cos(theta/2.0)
-    b, c, d = -axis*np.sin(theta/2.0)
-    aa, bb, cc, dd = a*a, b*b, c*c, d*d
-    bc, ad, ac, ab, bd, cd = b*c, a*d, a*c, a*b, b*d, c*d
-    return np.array([[aa+bb-cc-dd, 2*(bc+ad), 2*(bd-ac)],
-                     [2*(bc-ad), aa+cc-bb-dd, 2*(cd+ab)],
-                     [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
-
 class SkyModelGenerator:
     zenith = np.array((np.pi/2, 0))
 
@@ -120,22 +89,22 @@ class SkyModelGenerator:
         gamma = self.get_gamma(point_radians)
         return self.max_degree * pow(np.sin(gamma), 2) / (1 + pow(np.cos(gamma), 2))
 
-    def get_phi(self, point_radians):
-        warn_if_looks_like_degrees(point_radians)
-        cartesian_sun, cartesian_zenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.zenith, point_radians])]
-        v1 = cartesian_sun - cartesian_zenith
-        v2 = cartesian_observed - cartesian_zenith
-
-        return angle_between(v1, v2)
-
     def get_angle(self, point_radians):
-        # Knowing where the sun is, return an angle perpendicular to it
         cartesian_sun, cartesian_zenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.zenith, point_radians])]
-        #x, y = observed_to_sun_vector
 
         angle_vector = self.get_angle_vector(point_radians)
+        vertical_plane_normal = np.cross(cartesian_zenith, cartesian_observed)
 
-        return angle_between(cartesian_zenith, angle_vector)
+        angle = angle_between(vertical_plane_normal, angle_vector)
+
+        sun_azimuth = self.sun[1]
+        observed_azimuth = point_radians[1]
+         
+        #TODO understand why this is necessary
+        if observed_azimuth > sun_azimuth:
+            angle = -angle
+
+        return angle
     
     # useful for 3d plotting
     def get_angle_vector(self, point_radians):

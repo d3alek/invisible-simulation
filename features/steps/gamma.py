@@ -2,10 +2,13 @@ from behave import *
 from sky_model import SkyModelGenerator
 import numpy as np
 
-@given('{sun_or_look} at the {direction}')
+@given('{sun_or_look} at altitude {direction}')
 def step_impl(context, sun_or_look, direction):
     direction_to_degrees = {'horizon': 0, 'zenith': 90}
-    direction_degrees = direction_to_degrees[direction]
+    if direction.isdigit():
+        direction_degrees = int(direction)
+    else:
+        direction_degrees = direction_to_degrees[direction]
     if 'look' in sun_or_look:
         context.observed = (direction_degrees, context.observed[1])
 

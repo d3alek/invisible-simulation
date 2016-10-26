@@ -77,7 +77,7 @@ def cartesian2d(polar):
 def draw_sun():
     pygame.draw.circle(windowSurfaceObj, yellowColor, cartesian2d(sun_at), 20, 0)
 
-def draw_arrow(angle_rad, radians, width=1):
+def draw_arrow(angle_rad, radians, width=1, with_text=False):
     azimuth = radians[1]
     pos = cartesian2d(radians)
     arrow=pygame.Surface((20,20)) # square so that the engine does not cut the image due to rounding
@@ -87,17 +87,16 @@ def draw_arrow(angle_rad, radians, width=1):
     pygame.draw.line(arrow, whiteColor, (0,5), (20,5), width)
     arrow.set_colorkey(blackColor)
 
-    # adding np.pi/2 empirically determined when comparing to 3D plot (from reproduce_wiki_plots.py)
-    #rotated_arrow = pygame.transform.rotate(arrow, np.rad2deg(angle_rad + np.pi/2)) 
-    rotated_arrow = pygame.transform.rotate(arrow, np.rad2deg(angle_rad - azimuth + np.pi/2)) 
+    rotated_arrow = pygame.transform.rotate(arrow, np.rad2deg(angle_rad - azimuth)) 
     rect = rotated_arrow.get_rect(center=pos)
     windowSurfaceObj.blit(rotated_arrow, rect)
 
-    fontObj = pygame.font.Font('freesansbold.ttf', 13)
-    text = str(np.int16(np.round(np.rad2deg(angle_rad), 0)))
-    renderedFont = fontObj.render(text, False, redColor)
-    rect = renderedFont.get_rect(center=pos+5)
-    windowSurfaceObj.blit(renderedFont, rect)
+    if with_text:
+        fontObj = pygame.font.Font('freesansbold.ttf', 13)
+        text = str(np.int16(np.round(np.rad2deg(angle_rad), 0)))
+        renderedFont = fontObj.render(text, False, redColor)
+        rect = renderedFont.get_rect(center=pos+5)
+        windowSurfaceObj.blit(renderedFont, rect)
 
 def draw_angles():
     sky_model = SkyModelGenerator().with_sun_at(sun_at).generate(observed_altitudes, observed_azimuths)
