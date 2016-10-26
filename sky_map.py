@@ -6,7 +6,7 @@ Observer is facing north and looking up straight at the zenith. This means that:
 """
 
 import pygame, sys
-from features.sky_model import SkyModelGenerator, to_cartesian
+from features.sky_model import SkyModelGenerator
 import numpy as np
 from pygame.locals import *
 import ipdb
@@ -39,22 +39,7 @@ yellowColor = pygame.Color(255, 255, 0)
 sun_at = EAST
 ten_degrees_in_radians = np.pi/18
 observed_azimuths = np.arange(2*np.pi, step=ten_degrees_in_radians)
-observed_radii = np.arange(1, step=0.1) * RADIUS
-
-def radius_to_altitude(radius):
-    return (radius/RADIUS)*np.pi/2
-
-def altitude_to_radius(altitude):
-    return (altitude/(np.pi/2))*RADIUS
-
-observed_altitudes = np.array([*map(radius_to_altitude, observed_radii)])
-
-def cartesian_to_polar(cartesian):
-    x, y = cartesian
-    r = np.sqrt(x*x + y*y)
-    azimuth = np.arctan2(y, x)
-
-    return -r * np.pi/2 + np.pi/2, azimuth % (2*np.pi)
+observed_altitudes = np.arange(np.pi/2, step = ten_degrees_in_radians)
 
 def polar(sky_map_coordinates):
     """Opposite of cartesian2d. For some reason this doctest does not execute
@@ -66,27 +51,35 @@ def polar(sky_map_coordinates):
     >>> print(np.round((polar(cartesian2d(p))), 1))
     [ 0.5  0.3]
     """
-   
-    non_centered = (sky_map_coordinates - CENTER) / np.array([RADIUS, RADIUS])
-    x, y = non_centered
-    sky_model_cartesian = -y, x
 
-    return cartesian_to_polar(sky_model_cartesian)
+    distance_to_center_vector = sky_map_coordinates - CENTER
+    r = np.linalg.norm(distance_to_center_vector) / RADIUS
+    azimuth = np.arctan2(distance_to_center_vector[0], -distance_to_center_vector[1])
+
+    return (1-r)*np.pi/2, azimuth % (2*np.pi)
+
 
 def sky_model_cartesian_to_sky_map_cartesian(sky_model_cartesian):
-    y, x = sky_model_cartesian[:2]
+    x, y = sky_model_cartesian[:2]
 
-    return x, -y # need to invert y otherwise the azimuth rotates the wrong way (visible from the sun rotation)
+    return y, -x # need to invert y otherwise the azimuth rotates the wrong way (visible from the sun rotation)
 
 def cartesian2d(polar):
-    cartesian = sky_model_cartesian_to_sky_map_cartesian(to_cartesian(polar))
+    altitude, azimuth = polar
+    r = 1 - altitude/(np.pi/2)
+    x = np.sin(azimuth)*r 
+    y = -np.cos(azimuth)*r
+
+    cartesian = x, y
 
     return np.int32(CENTER + cartesian * np.array([RADIUS, RADIUS]))
 
 def draw_sun():
     pygame.draw.circle(windowSurfaceObj, yellowColor, cartesian2d(sun_at), 20, 0)
 
-def draw_arrow(angle_rad, pos, width=1):
+def draw_arrow(angle_rad, radians, width=1):
+    azimuth = radians[1]
+    pos = cartesian2d(radians)
     arrow=pygame.Surface((20,20)) # square so that the engine does not cut the image due to rounding
     arrow.fill(blackColor)
     pygame.draw.line(arrow, whiteColor, (15,0), (20,5), width)
@@ -95,12 +88,14 @@ def draw_arrow(angle_rad, pos, width=1):
     arrow.set_colorkey(blackColor)
 
     # adding np.pi/2 empirically determined when comparing to 3D plot (from reproduce_wiki_plots.py)
-    rotated_arrow = pygame.transform.rotate(arrow, np.rad2deg(angle_rad)) 
+    #rotated_arrow = pygame.transform.rotate(arrow, np.rad2deg(angle_rad + np.pi/2)) 
+    rotated_arrow = pygame.transform.rotate(arrow, np.rad2deg(angle_rad - azimuth + np.pi/2)) 
     rect = rotated_arrow.get_rect(center=pos)
     windowSurfaceObj.blit(rotated_arrow, rect)
 
     fontObj = pygame.font.Font('freesansbold.ttf', 13)
-    renderedFont = fontObj.render(str(np.int8(np.round(np.rad2deg(angle_rad), 0))), False, redColor)
+    text = str(np.int16(np.round(np.rad2deg(angle_rad), 0)))
+    renderedFont = fontObj.render(text, False, redColor)
     rect = renderedFont.get_rect(center=pos+5)
     windowSurfaceObj.blit(renderedFont, rect)
 
@@ -108,31 +103,9 @@ def draw_angles():
     sky_model = SkyModelGenerator().with_sun_at(sun_at).generate(observed_altitudes, observed_azimuths)
     for index_altitude, altitude in enumerate(observed_altitudes):
         for index_azimuth, azimuth in enumerate(observed_azimuths):
-            pos = cartesian2d((altitude, azimuth))
             angle = sky_model.angles[index_altitude, index_azimuth]
             degree = sky_model.degrees[index_altitude, index_azimuth]
-            draw_arrow(angle, pos, int(1+5*degree))
-
-date = datetime.date.today()
-def calculate_sunrise_sunset_times():
-    times = datetime.time(8, 0), datetime.time(18, 0)
-    return [*map(lambda a: datetime.datetime.combine(date, a), times)]
-
-def pysolar_to_local(pysolar_position):
-    altitude, azimuth = pysolar_position
-    return np.deg2rad(altitude), np.deg2rad((-azimuth + 180) % 360)
-
-def sun_position(datetime):
-    return pysolar_to_local((get_altitude(LATITUDE_SEVILLA, LONGITUDE_SEVILLA, datetime), get_azimuth(37.366123, -5.996422, datetime)))
-
-sunrise_time, sunset_time = calculate_sunrise_sunset_times()
-day_length = sunset_time - sunrise_time
-hours = day_length.seconds/(3600)
-minutes = (day_length.seconds%(3600))/60
-print("Day length is %d:%02d hours" % (hours, minutes))
-
-sun_at = sun_position(sunrise_time)
-mouse_down = False
+            draw_arrow(angle, (altitude, azimuth), int(1+5*degree))
 
 date = datetime.date.today()
 def calculate_sunrise_sunset_times():

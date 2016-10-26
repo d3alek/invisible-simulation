@@ -100,13 +100,14 @@ class SkyModelGenerator:
         return self
 
     def get_gamma(self, point_radians):
-        """ Angular distance between the observed pointing and the sun """
+        """ Angular distance between the observed pointing and the sun. Scattering angle. """
         warn_if_looks_like_degrees(point_radians)
         cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, point_radians])]
         return angle_between(cartesian_sun, cartesian_observed)
 
     def get_theta_sun(self):
         """ The solar zenith distance (90\deg - solar altitude) """
+        warn_if_looks_like_degrees(self.sun)
         return np.pi/2 - self.sun[0]
     
     def get_theta(self, point_radians):
@@ -127,35 +128,14 @@ class SkyModelGenerator:
 
         return angle_between(v1, v2)
 
-    # http://www.math.ucla.edu/~ronmiech/Calculus_Problems/32A/chap11/section4/708d23/708_23.html
-
     def get_angle(self, point_radians):
+        # Knowing where the sun is, return an angle perpendicular to it
+        cartesian_sun, cartesian_zenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.zenith, point_radians])]
+        #x, y = observed_to_sun_vector
+
         angle_vector = self.get_angle_vector(point_radians)
 
-        cartesian_observed = to_cartesian(point_radians)
-        tangent_plane_normal = unit_vector(cartesian_observed)
-        projected_angle_vector = project(angle_vector, tangent_plane_normal)
-        
-        # following http://stackoverflow.com/questions/6802577/python-rotation-of-3d-vector
-	
-        normal = (0, 0, 1)
-        rotation_axis = np.cross(normal, tangent_plane_normal)
-        matrix = rotation_matrix(rotation_axis, angle_between(tangent_plane_normal, normal))
-        assert np.allclose(np.dot(tangent_plane_normal, matrix), normal)
-
-        rotated_angle_vector = np.dot(projected_angle_vector, matrix)
-
-        #angle = np.arctan2(rotated_angle_vector[1], rotated_angle_vector[0])
-        angle = angle_between(rotated_angle_vector, (1, 0, 0))
-        if angle < 0:
-            angle += np.pi
-
-        if angle > 180:
-            angle -= np.pi/2
-
-        assert angle >= 0 and angle <= 180
-
-        return angle
+        return angle_between(cartesian_zenith, angle_vector)
     
     # useful for 3d plotting
     def get_angle_vector(self, point_radians):
