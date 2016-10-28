@@ -11,8 +11,8 @@ import numpy as np
 from pygame.locals import *
 import ipdb
 
-from pysolar.solar import *
 import datetime
+from sun_calculator import sunrise_sunset, sun_position
 
 pygame.init()
 fpsClock = pygame.time.Clock()
@@ -20,8 +20,6 @@ fpsClock = pygame.time.Clock()
 EAST = (0, np.pi/2)
 
 RADIUS = 400
-LATITUDE_SEVILLA = 37.366123
-LONGITUDE_SEVILLA = -5.996422
 
 WIDTH = 2*RADIUS + 100
 HEIGHT = WIDTH
@@ -99,26 +97,16 @@ def draw_arrow(angle_rad, radians, width=1, with_text=False):
         windowSurfaceObj.blit(renderedFont, rect)
 
 def draw_angles():
-    sky_model = SkyModelGenerator().with_sun_at(sun_at).generate(observed_altitudes, observed_azimuths)
+    sky_model = SkyModelGenerator(sun_at).generate(observed_altitudes, observed_azimuths)
     for index_altitude, altitude in enumerate(observed_altitudes):
         for index_azimuth, azimuth in enumerate(observed_azimuths):
             angle = sky_model.angles[index_altitude, index_azimuth]
             degree = sky_model.degrees[index_altitude, index_azimuth]
             draw_arrow(angle, (altitude, azimuth), int(1+5*degree))
 
-date = datetime.date.today()
-def calculate_sunrise_sunset_times():
-    times = datetime.time(8, 0), datetime.time(18, 0)
-    return [*map(lambda a: datetime.datetime.combine(date, a), times)]
-
-def pysolar_to_local(pysolar_position):
-    altitude, azimuth = pysolar_position
-    return np.deg2rad(altitude), np.deg2rad((-azimuth + 180) % 360)
-
-def sun_position(datetime):
-    return pysolar_to_local((get_altitude(LATITUDE_SEVILLA, LONGITUDE_SEVILLA, datetime), get_azimuth(LATITUDE_SEVILLA, LONGITUDE_SEVILLA, datetime)))
-
-sunrise_time, sunset_time = calculate_sunrise_sunset_times()
+when = datetime.datetime.utcnow()
+sunrise_time, sunset_time = sunrise_sunset(when)
+print("Sunrise: %s, Sunset %s" % (sunrise_time, sunset_time))
 day_length = sunset_time - sunrise_time
 hours = day_length.seconds/(3600)
 minutes = (day_length.seconds%(3600))/60
@@ -129,7 +117,7 @@ mouse_down = False
 
 def print_angle_and_degree_at(sky_map_coordinates):
     observed = polar(sky_map_coordinates)
-    sky_model_generator = SkyModelGenerator().with_sun_at(sun_at)
+    sky_model_generator = SkyModelGenerator(sun_at)
     print("Observed: %s Angle: %f Degree %f" % (np.rad2deg(observed), np.rad2deg(sky_model_generator.get_angle(observed)), sky_model_generator.get_degree(observed)))
 
 if __name__ == "__main__":

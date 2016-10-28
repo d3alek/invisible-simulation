@@ -24,10 +24,10 @@ def matrix_from_func(func):
 
     return np.array(rows)
 
-gamma_func = lambda alt, azim: np.rad2deg(SkyModelGenerator().with_sun_at(sun).get_gamma((alt, azim)))
+gamma_func = lambda alt, azim: np.rad2deg(SkyModelGenerator(sun).get_gamma((alt, azim)))
 gamma_image = matrix_from_func(gamma_func)
 
-theta_func = lambda alt, azim: np.rad2deg(SkyModelGenerator().with_sun_at(sun).get_theta((alt, azim)))
+theta_func = lambda alt, azim: np.rad2deg(SkyModelGenerator(sun).get_theta((alt, azim)))
 theta_image = matrix_from_func(theta_func)
 
 images = [gamma_image, theta_image]
@@ -43,7 +43,7 @@ fig.colorbar(im, cax=cbar_ax)
 
 plt.figure()
 
-horizon_degrees = [SkyModelGenerator(max_degree=1).with_sun_at(sun).get_degree((0, azim)) for azim in observed_azimuths]
+horizon_degrees = [SkyModelGenerator(sun, max_degree=1).get_degree((0, azim)) for azim in observed_azimuths]
 plt.plot(horizon_degrees);
 plt.xlabel('Azimuth');
 plt.ylabel('% Polarization on Horizon')
@@ -55,7 +55,7 @@ for sun in [EAST, (np.pi/2 - 0.8, np.pi), WEST]:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    sm = SkyModelGenerator().with_sun_at(sun).generate()
+    sm = SkyModelGenerator(sun).generate()
 
     u, v, w = np.empty(sm.angle_vectors.shape), np.empty(sm.angle_vectors.shape), np.empty(sm.angle_vectors.shape)
 

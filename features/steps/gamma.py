@@ -29,6 +29,6 @@ def step_impl(context, direction):
 @then('gamma is {expected_gamma:d}')
 def step_impl(context, expected_gamma):
     observed_radians = [*map(np.deg2rad, context.observed)]
-    gamma_degrees = np.floor(np.rad2deg(SkyModelGenerator().with_sun_at_degrees(context.sun).get_gamma(observed_radians)))
+    gamma_degrees = np.floor(np.rad2deg(SkyModelGenerator(tuple(map(np.deg2rad, context.sun))).get_gamma(observed_radians)))
     assert np.isclose(gamma_degrees, expected_gamma), "Expected %d, actual %d" % (expected_gamma, gamma_degrees)
 

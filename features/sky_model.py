@@ -56,17 +56,10 @@ def warn_if_looks_like_degrees(radians):
 class SkyModelGenerator:
     zenith = np.array((np.pi/2, 0))
 
-    def __init__(self, max_degree = 0.8):
+    def __init__(self, sun_radians, max_degree = 0.8):
+        warn_if_looks_like_degrees(sun_radians)
+        self.sun = sun_radians
         self.max_degree = max_degree
-
-    def with_sun_at_degrees(self, sun_position_degrees):
-        radians = [*map(np.deg2rad,sun_position_degrees)]
-        return self.with_sun_at(radians)
-
-    def with_sun_at(self, sun_position_radians):
-        warn_if_looks_like_degrees(sun_position_radians)
-        self.sun = sun_position_radians
-        return self
 
     def get_gamma(self, point_radians):
         """ Angular distance between the observed pointing and the sun. Scattering angle. """

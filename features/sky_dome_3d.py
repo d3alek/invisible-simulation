@@ -20,7 +20,7 @@ for sun in [EAST, (np.pi/2 - 0.8, np.pi), WEST]:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    sm = SkyModelGenerator().with_sun_at(sun).generate()
+    sm = SkyModelGenerator(sun).generate()
 
     u, v, w = np.empty(sm.angle_vectors.shape), np.empty(sm.angle_vectors.shape), np.empty(sm.angle_vectors.shape)
     linewidths = np.empty(sm.angle_vectors.size)
