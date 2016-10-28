@@ -79,3 +79,16 @@ exog = sm.add_constant(exog)
 model = sm.OLS(endog, exog)
 results = model.fit()
 print(results.summary())
+import pickle
+
+params = results.params
+angles = params[1:params.size//2] # skipping constant column added by sm
+degrees = params[params.size//2+1:]
+
+from ast import literal_eval as make_tuple
+def human_to_polar(string):
+    return tuple(map(np.deg2rad, make_tuple(string[1:])))
+
+result = {'angles': ([*map(human_to_polar, angles.index)], angles.values),'degrees': ([*map(human_to_polar, degrees.index)], degrees.values)}
+
+pickle.dump(result, open('data/polarization_time_predictor_result.pickle','wb'))

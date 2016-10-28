@@ -120,9 +120,22 @@ def print_angle_and_degree_at(sky_map_coordinates):
     sky_model_generator = SkyModelGenerator(sun_at)
     print("Observed: %s Angle: %f Degree %f" % (np.rad2deg(observed), np.rad2deg(sky_model_generator.get_angle(observed)), sky_model_generator.get_degree(observed)))
 
+def normalize(array):
+    return (array - array.min())/(array.max() - array.min())
+
+def draw_predictors(predictors):
+    normalized_parameters = normalize(predictors[1])
+    for polar, parameter in zip(predictors[0], normalized_parameters):
+        pygame.draw.circle(windowSurfaceObj, redColor, cartesian2d(polar), int(10*parameter), 0)
+
+    #pygame.draw.circle(windowSurfaceObj, blueColor, cartesian2d(sun_at), 20, 0)
+
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
+
+    show_predictors = False
+    show_degree_predictors = False
 
     while True:
         windowSurfaceObj.fill(blackColor)
@@ -148,10 +161,24 @@ if __name__ == "__main__":
             elif event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
                     pygame.event.post(pygame.event.Event(QUIT))
+                if event.key == K_p:
+                    show_predictors = not show_predictors
+                    if show_predictors:
+                        import pickle
+                        prediction_result = pickle.load(open('data/polarization_time_predictor_result.pickle', 'rb'))
+                if event.key == K_d:
+                    show_degree_predictors = not show_degree_predictors
+                    print("Show degree predictors: %s" % show_degree_predictors)
 
         draw_angles()
 
         draw_sun()
+
+        if show_predictors:
+            if show_degree_predictors:
+                draw_predictors(prediction_result['degrees'])
+            else:
+                draw_predictors(prediction_result['angles'])
         pygame.display.update()
         fpsClock.tick(10)
 
