@@ -11,27 +11,19 @@ import datetime
 
 import argparse
 
-parser = argparse.ArgumentParser(description='Do a linear regression on a sample of the sky over N days to predict the time of day.')
-parser.add_argument('--days', metavar='N', type=int, default=100,
-                            help='the number of days to gather training data for')
-parser.add_argument('--load', action='store_true', default=False, help='load latest used data (default: calculate new data and save it as latest)')
+import pickle
 
-args = parser.parse_args()
-
-days = args.days
-load = args.load
+from ast import literal_eval as make_tuple
 
 store = pd.HDFStore('data/latest_polarization_time_predictor_data.h5')
 
-if load:
-    data = store['data']
-else:
+ten_degrees_in_radians = np.pi/18
+OBSERVED_ALTITUDES = np.arange(np.pi/2, step=ten_degrees_in_radians)
+OBSERVED_AZIMUTHS = np.arange(2*np.pi, step=ten_degrees_in_radians)
+
+def generate_data(days):
     EAST = (0, np.pi/2)
     sun_at = EAST
-
-    ten_degrees_in_radians = np.pi/18
-    OBSERVED_ALTITUDES = np.arange(np.pi/2, step=ten_degrees_in_radians)
-    OBSERVED_AZIMUTHS = np.arange(2*np.pi, step=ten_degrees_in_radians)
 
     day = datetime.datetime.utcnow()
     sunrise, sunset = sunrise_sunset(day)
@@ -72,23 +64,51 @@ else:
                 data = df
 
     store['data'] = data
+    return data
 
-endog = data['time']
-exog = data.loc[:, data.columns[:-1]]
-exog = sm.add_constant(exog)
-model = sm.OLS(endog, exog)
-results = model.fit()
-print(results.summary())
-import pickle
-
-params = results.params
-angles = params[1:params.size//2] # skipping constant column added by sm
-degrees = params[params.size//2+1:]
-
-from ast import literal_eval as make_tuple
 def human_to_polar(string):
     return tuple(map(np.deg2rad, make_tuple(string[1:])))
 
-result = {'angles': ([*map(human_to_polar, angles.index)], angles.values),'degrees': ([*map(human_to_polar, degrees.index)], degrees.values)}
+def analyze_data(data):
+    endog = data['time']
+    exog = data.loc[:, data.columns[:-1]]
+    exog = sm.add_constant(exog)
+    model = sm.OLS(endog, exog)
+    results = model.fit()
+    print(results.summary())
 
-pickle.dump(result, open('data/polarization_time_predictor_result.pickle','wb'))
+    params = results.params
+    angles = params[1:params.size//2] # skipping constant column added by sm
+    degrees = params[params.size//2+1:]
+
+    result = {'angles': ([*map(human_to_polar, angles.index)], angles.values),'degrees': ([*map(human_to_polar, degrees.index)], degrees.values)}
+
+    pickle.dump(result, open('data/polarization_time_predictor_result.pickle','wb'))
+
+    return results
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Do a linear regression on a sample of the sky over N days to predict the time of day.')
+    parser.add_argument('--days', metavar='N', type=int, default=100,
+                                help='the number of days to gather training data for')
+    parser.add_argument('--load', action='store_true', default=False, help='load latest used data (default: calculate new data and save it as latest)')
+
+    args = parser.parse_args()
+
+    days = args.days
+    load = args.load
+
+    if load:
+        data = store['data']
+    else:
+        data = generate_data(days)
+
+    model = analyze_data(data)
+
+    time = datetime.datetime.utcnow() - datetime.timedelta(days=1)
+    sky_model = SkyModelGenerator(sun_position(time)).generate(OBSERVED_ALTITUDES, OBSERVED_AZIMUTHS)
+    angles = sky_model.angles.flatten()
+    degrees = sky_model.degrees.flatten()
+    angles_degrees = np.append(angles, degrees)
+    angles_degrees_one = np.append([1], angles_degrees)
+    print("Prediction for this time yesterday: %s" % model.predict(angles_degrees_one))
