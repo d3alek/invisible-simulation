@@ -86,15 +86,28 @@ def analyze_data(data):
 
     return results
 
-def predict(time):
-    sky_model = SkyModelGenerator(sun_position(time)).generate(OBSERVED_ALTITUDES, OBSERVED_AZIMUTHS)
+def predict(datetime):
+    sky_model = SkyModelGenerator(sun_position(datetime)).generate(OBSERVED_ALTITUDES, OBSERVED_AZIMUTHS)
     angles = sky_model.angles.flatten()
     degrees = sky_model.degrees.flatten()
     angles_degrees = np.append(angles, degrees)
     angles_degrees_one = np.append([1], angles_degrees)
     prediction = model.predict(angles_degrees_one)
     times = model.fittedvalues.index
-    print("For %s prediction %s which translates to %s" % (time, prediction, times[int(prediction)]))
+    predicted_datetime = times[int(prediction)]
+    predicted_time = predicted_datetime.time()
+    time = datetime.time()
+    if predicted_time > time:
+        delta_time = datetime.combine(datetime, predicted_time) - datetime.combine(datetime, time)
+    else:
+        delta_time = datetime.combine(datetime, time) - datetime.combine(datetime, predicted_time)
+
+    #print("For %s prediction %s which translates to %s (delta time %s)" % (datetime, prediction, predicted_datetime, delta_time))
+
+    return delta_time
+
+def timedelta_to_minutes(timedelta):
+    return timedelta.total_seconds()/60
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Do a linear regression on a sample of the sky over N days to predict the time of day.')
@@ -114,6 +127,13 @@ if __name__ == "__main__":
 
     model = analyze_data(data)
 
-    for minutes in range(0, 200, 10):
-        predict(datetime.datetime.utcnow() + datetime.timedelta(minutes=minutes))
+    date = datetime.datetime.combine(datetime.datetime.utcnow().date(), datetime.time(10,00))
+    for days in range(0, 10):
+        prediction_errors = []
+        day = date + datetime.timedelta(days=days)
+        for minutes in range(0, 300):
+            prediction_error = predict(day + datetime.timedelta(minutes=minutes))
+            prediction_errors.append(prediction_error)
+        prediction_errors_minutes = [*map(timedelta_to_minutes, prediction_errors)]
+        print ("%s error mean %s median %s" % (day.date(), np.mean(prediction_errors_minutes), np.median(prediction_errors_minutes)))
 
