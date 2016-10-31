@@ -20,23 +20,25 @@ store = pd.HDFStore('data/latest_polarization_time_predictor_data.h5')
 OBSERVED_ALTITUDES = np.arange(np.pi/2, step=np.pi/20)
 OBSERVED_AZIMUTHS = np.arange(2*np.pi, step=np.pi/5)
 
-def generate_data(days):
+def generate_data(date, days, frequency_string):
+    print("Generating data from %s for %d days at frequency %s" % (date, days, frequency_string))
     EAST = (0, np.pi/2)
     sun_at = EAST
 
-    day = datetime.datetime.utcnow()
-    sunrise, sunset = sunrise_sunset(day)
+    date = datetime.datetime.combine(date, datetime.time(10, 00)) # just to make a datetime, necessary for the following function to work
+    sunrise, sunset = sunrise_sunset(date)
     print("Sunrise: %s, Sunset %s" % (sunrise, sunset))
     day_length = sunset - sunrise
     hours = day_length.seconds/(3600)
     minutes = (day_length.seconds%(3600))/60
     print("Day length is %d:%02d hours" % (hours, minutes))
 
-    time_samples = pd.date_range(start=sunrise, end=sunset, freq='10min')
+    time_samples = pd.date_range(start=sunrise, end=sunset, freq=frequency_string)
 
     data = None
 
     for day in range(days):
+        print("Generating sky for day %s" % day)
         for index, time in enumerate(time_samples):
             time = time + datetime.timedelta(days=day)
             sky_model = SkyModelGenerator(sun_position(time)).generate(observed_altitudes = OBSERVED_ALTITUDES, observed_azimuths = OBSERVED_AZIMUTHS)
@@ -63,6 +65,7 @@ def generate_data(days):
                 data = df
 
     store['data'] = data
+    print("Stored data")
     return data
 
 def human_to_polar(string):
@@ -110,30 +113,48 @@ def timedelta_to_minutes(timedelta):
     return timedelta.total_seconds()/60
 
 if __name__ == "__main__":
+    today = datetime.datetime.utcnow().date()
     parser = argparse.ArgumentParser(description='Do a linear regression on a sample of the sky over N days to predict the time of day.')
+    parser.add_argument('--date', default=today.strftime('%y%m%d'), help="start date for training data generation")
     parser.add_argument('--days', metavar='N', type=int, default=10,
                                 help='the number of days to gather training data for')
+    parser.add_argument('--freq', default="10mins",
+                                help='how often to sample the time between sunset and sunrize (10mins, 1H, etc)')
     parser.add_argument('--load', action='store_true', default=False, help='load latest used data (default: calculate new data and save it as latest)')
+    parser.add_argument('--test', default=True, help='should the model be evaluated')
+    parser.add_argument('--test-date', default=today.strftime('%y%m%d'), help='date to start the test with')
+    parser.add_argument('--test-days', default=10, type=int, help='how many days after the test date to test with')
+    parser.add_argument('--test-time', default="10:00", help='time of day to start the test with')
+    parser.add_argument('--test-minutes', default=300, type=int, help='minutes to test with each test day')
 
     args = parser.parse_args()
 
+    date = datetime.datetime.strptime(args.date, '%y%m%d').date()
     days = args.days
+    freq = args.freq
     load = args.load
+    test = args.test
+    test_date = datetime.datetime.strptime(args.test_date, '%y%m%d').date()
+    test_days = args.test_days
+    test_time = datetime.datetime.strptime(args.test_time, '%H:%M').time()
+    test_minutes = args.test_minutes
 
     if load:
         data = store['data']
     else:
-        data = generate_data(days)
+        data = generate_data(date, days, freq)
 
     model = analyze_data(data)
 
-    date = datetime.datetime.combine(datetime.datetime.utcnow().date(), datetime.time(10,00))
-    for days in range(0, 10):
-        prediction_errors = []
-        day = date + datetime.timedelta(days=days)
-        for minutes in range(0, 300):
-            prediction_error = predict(day + datetime.timedelta(minutes=minutes))
-            prediction_errors.append(prediction_error)
-        prediction_errors_minutes = [*map(timedelta_to_minutes, prediction_errors)]
-        print ("%s error mean %s median %s" % (day.date(), np.mean(prediction_errors_minutes), np.median(prediction_errors_minutes)))
+    if test:
+        print("Testing starting from %s %s for %d minutes each day" % (test_date, test_time, test_minutes))
+        date = datetime.datetime.combine(test_date, test_time)
+        for days in range(test_days):
+            prediction_errors = []
+            day = date + datetime.timedelta(days=days)
+            for minutes in range(test_minutes):
+                prediction_error = predict(day + datetime.timedelta(minutes=minutes))
+                prediction_errors.append(prediction_error)
+            prediction_errors_minutes = [*map(timedelta_to_minutes, prediction_errors)]
+            print ("%s error mean %s median %s" % (day.date(), np.mean(prediction_errors_minutes), np.median(prediction_errors_minutes)))
 
