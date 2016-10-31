@@ -17,9 +17,8 @@ from ast import literal_eval as make_tuple
 
 store = pd.HDFStore('data/latest_polarization_time_predictor_data.h5')
 
-ten_degrees_in_radians = np.pi/18
-OBSERVED_ALTITUDES = np.arange(np.pi/2, step=ten_degrees_in_radians)
-OBSERVED_AZIMUTHS = np.arange(2*np.pi, step=ten_degrees_in_radians)
+OBSERVED_ALTITUDES = np.arange(np.pi/2, step=np.pi/20)
+OBSERVED_AZIMUTHS = np.arange(2*np.pi, step=np.pi/5)
 
 def generate_data(days):
     EAST = (0, np.pi/2)
@@ -33,7 +32,7 @@ def generate_data(days):
     minutes = (day_length.seconds%(3600))/60
     print("Day length is %d:%02d hours" % (hours, minutes))
 
-    time_samples = pd.date_range(start=sunrise, end=sunset, freq='H')
+    time_samples = pd.date_range(start=sunrise, end=sunset, freq='10min')
 
     data = None
 
@@ -87,9 +86,19 @@ def analyze_data(data):
 
     return results
 
+def predict(time):
+    sky_model = SkyModelGenerator(sun_position(time)).generate(OBSERVED_ALTITUDES, OBSERVED_AZIMUTHS)
+    angles = sky_model.angles.flatten()
+    degrees = sky_model.degrees.flatten()
+    angles_degrees = np.append(angles, degrees)
+    angles_degrees_one = np.append([1], angles_degrees)
+    prediction = model.predict(angles_degrees_one)
+    times = model.fittedvalues.index
+    print("For %s prediction %s which translates to %s" % (time, prediction, times[int(prediction)]))
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Do a linear regression on a sample of the sky over N days to predict the time of day.')
-    parser.add_argument('--days', metavar='N', type=int, default=100,
+    parser.add_argument('--days', metavar='N', type=int, default=10,
                                 help='the number of days to gather training data for')
     parser.add_argument('--load', action='store_true', default=False, help='load latest used data (default: calculate new data and save it as latest)')
 
@@ -105,10 +114,6 @@ if __name__ == "__main__":
 
     model = analyze_data(data)
 
-    time = datetime.datetime.utcnow() - datetime.timedelta(days=1)
-    sky_model = SkyModelGenerator(sun_position(time)).generate(OBSERVED_ALTITUDES, OBSERVED_AZIMUTHS)
-    angles = sky_model.angles.flatten()
-    degrees = sky_model.degrees.flatten()
-    angles_degrees = np.append(angles, degrees)
-    angles_degrees_one = np.append([1], angles_degrees)
-    print("Prediction for this time yesterday: %s" % model.predict(angles_degrees_one))
+    for minutes in range(0, 200, 10):
+        predict(datetime.datetime.utcnow() + datetime.timedelta(minutes=minutes))
+
