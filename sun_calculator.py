@@ -25,5 +25,5 @@ def sun_position(datetime_utc):
     local_datetime = pytz.timezone(TIMEZONE).localize(datetime_utc)
     raw_localized_datetime = datetime_utc + local_datetime.dst()
 
-    return pysolar_to_local((get_altitude(LATITUDE, LONGITUDE, localized_datetime), get_azimuth(LATITUDE, LONGITUDE, localized_datetime)))
+    return pysolar_to_local((get_altitude(LATITUDE, LONGITUDE, raw_localized_datetime), get_azimuth(LATITUDE, LONGITUDE, raw_localized_datetime)))
 
