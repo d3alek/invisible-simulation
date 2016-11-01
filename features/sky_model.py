@@ -50,16 +50,20 @@ def to_cartesian(spherical_coordinates):
     return np.array((np.sin(altitude) * np.cos(azimuth), np.sin(altitude) * np.sin(azimuth), -np.cos(altitude)))
 
 def warn_if_looks_like_degrees(radians):
-    if max(radians) > 2*np.pi:
+    if max(radians) > 4*np.pi:
        print("It is possible you are passing degrees to a function that expects radians. Radians passed: ", radians) 
+
+def rotate_yaw(polar, yaw_radians):
+    return (polar[0], polar[1] + yaw_radians)
 
 class SkyModelGenerator:
     zenith = np.array((np.pi/2, 0))
 
-    def __init__(self, sun_radians, max_degree = 0.8):
+    def __init__(self, sun_radians, max_degree=0.8, yaw=0):
         warn_if_looks_like_degrees(sun_radians)
         self.sun = sun_radians
         self.max_degree = max_degree
+        self.yaw = yaw
 
     def get_gamma(self, point_radians):
         """ Angular distance between the observed pointing and the sun. Scattering angle. """
@@ -79,29 +83,31 @@ class SkyModelGenerator:
 
     def get_degree(self, point_radians):
         warn_if_looks_like_degrees(point_radians)
-        gamma = self.get_gamma(point_radians)
+        local_point_radians = self.to_local(point_radians)
+        gamma = self.get_gamma(local_point_radians)
         return self.max_degree * pow(np.sin(gamma), 2) / (1 + pow(np.cos(gamma), 2))
 
     def get_angle(self, point_radians):
-        cartesian_sun, cartesian_zenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.zenith, point_radians])]
+        local_point_radians = self.to_local(point_radians)
+        cartesian_sun, cartesian_zenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.zenith, local_point_radians])]
 
-        angle_vector = self.get_angle_vector(point_radians)
+        angle_vector = self.get_angle_vector(local_point_radians)
         vertical_plane_normal = np.cross(cartesian_zenith, cartesian_observed)
 
         angle = angle_between(vertical_plane_normal, angle_vector)
 
         sun_azimuth = self.sun[1]
-        observed_azimuth = point_radians[1]
+        observed_azimuth = local_point_radians[1]
          
         #TODO understand why this is necessary
         if observed_azimuth > sun_azimuth:
             angle = -angle
 
-        return angle
+        return self.to_world(angle)
     
     # useful for 3d plotting
-    def get_angle_vector(self, point_radians):
-        cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, point_radians])]
+    def get_angle_vector(self, local_point_radians):
+        cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, local_point_radians])]
         orthogonal = np.cross(cartesian_sun, cartesian_observed)
         if np.isclose(np.linalg.norm(orthogonal), 0):
             return (1, 0, 0)
@@ -125,6 +131,21 @@ class SkyModelGenerator:
 
         x, y, z = zip(*cartesian)
         return SkyModel(observed_azimuths, observed_altitudes, x, y, z, angles, angle_vectors, degrees)
+
+    def get_sun_polar(self):
+        return self.to_world(self.sun)
+
+    def to_world(self, polar):
+        if np.isscalar(polar):
+            return polar + self.yaw
+        else:
+            return rotate_yaw(polar, self.yaw)
+    
+    def to_local(self, polar):
+        if np.isscalar(polar):
+            return polar - self.yaw
+        else:
+            return rotate_yaw(polar, -self.yaw)
 
 class SkyModel:
     def __init__(self, observed_azimuths, observed_altitudes, x, y, z, angles, angle_vectors, degrees):

@@ -72,22 +72,31 @@ def cartesian2d(polar):
 
     return np.int32(CENTER + cartesian * np.array([RADIUS, RADIUS]))
 
-def draw_sun():
-    pygame.draw.circle(windowSurfaceObj, yellowColor, cartesian2d(sun_at), 20, 0)
+def draw_sun(sky_model_generator):
+    pygame.draw.circle(windowSurfaceObj, yellowColor, cartesian2d(sky_model_generator.get_sun_polar()), 20, 0)
 
-def draw_arrow(angle_rad, radians, width=1, with_text=False):
-    azimuth = radians[1]
-    pos = cartesian2d(radians)
+def draw_arrow(color, width, rotated=0):
     arrow=pygame.Surface((20,20)) # square so that the engine does not cut the image due to rounding
     arrow.fill(blackColor)
-    pygame.draw.line(arrow, whiteColor, (15,0), (20,5), width)
-    pygame.draw.line(arrow, whiteColor, (15,10), (20,5), width)
-    pygame.draw.line(arrow, whiteColor, (0,5), (20,5), width)
+    pygame.draw.line(arrow, color, (15,0), (20,5), width)
+    pygame.draw.line(arrow, color, (15,10), (20,5), width)
+    pygame.draw.line(arrow, color, (0,5), (20,5), width)
     arrow.set_colorkey(blackColor)
 
-    rotated_arrow = pygame.transform.rotate(arrow, np.rad2deg(angle_rad - azimuth)) 
-    rect = rotated_arrow.get_rect(center=pos)
-    windowSurfaceObj.blit(rotated_arrow, rect)
+    return pygame.transform.rotate(arrow, rotated) 
+
+def draw_angle_arrow(angle_rad, radians, yaw_radians, width=1, with_text=False):
+    azimuth = radians[1]
+    pos = cartesian2d(radians)
+
+    # necessary because each point's angle is calculated as if observer is looking towards that point
+    # but in the visualization observer is assumed to be looking at yaw
+    rotate = np.rad2deg(angle_rad - azimuth - yaw_radians)
+    arrow = draw_arrow(whiteColor, width, rotated=rotate)
+
+
+    rect = arrow.get_rect(center=pos)
+    windowSurfaceObj.blit(arrow, rect)
 
     if with_text:
         fontObj = pygame.font.Font('freesansbold.ttf', 13)
@@ -96,13 +105,18 @@ def draw_arrow(angle_rad, radians, width=1, with_text=False):
         rect = renderedFont.get_rect(center=pos+5)
         windowSurfaceObj.blit(renderedFont, rect)
 
-def draw_angles():
-    sky_model = SkyModelGenerator(sun_at).generate(observed_altitudes, observed_azimuths)
+def draw_looking_at(yaw_degrees):
+    arrow = draw_arrow(redColor, 3, 90-yaw_degrees)
+    rect = arrow.get_rect(center=CENTER)
+    windowSurfaceObj.blit(arrow, rect)
+
+def draw_angles(sky_model_generator):
+    sky_model = sky_model_generator.generate(observed_altitudes, observed_azimuths)
     for index_altitude, altitude in enumerate(observed_altitudes):
         for index_azimuth, azimuth in enumerate(observed_azimuths):
             angle = sky_model.angles[index_altitude, index_azimuth]
             degree = sky_model.degrees[index_altitude, index_azimuth]
-            draw_arrow(angle, (altitude, azimuth), int(1+5*degree))
+            draw_angle_arrow(angle, (altitude, azimuth), sky_model_generator.yaw, int(1+5*degree))
 
 if len(sys.argv) > 1:
     when = datetime.datetime.strptime(sys.argv[1], "%y%m%d")
@@ -141,6 +155,8 @@ if __name__ == "__main__":
     show_predictors = False
     show_degree_predictors = False
 
+    yaw = 0
+
     while True:
         windowSurfaceObj.fill(blackColor)
 
@@ -173,10 +189,15 @@ if __name__ == "__main__":
                 if event.key == K_d:
                     show_degree_predictors = not show_degree_predictors
                     print("Show degree predictors: %s" % show_degree_predictors)
+                if event.key == K_LEFT:
+                    yaw += 10
+                if event.key == K_RIGHT:
+                    yaw -= 10
 
-        draw_angles()
-
-        draw_sun()
+        sky_model_generator = SkyModelGenerator(sun_at, yaw=np.deg2rad(yaw))
+        draw_angles(sky_model_generator)
+        draw_sun(sky_model_generator)
+        draw_looking_at(yaw)
 
         if show_predictors:
             if show_degree_predictors:
