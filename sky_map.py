@@ -104,7 +104,11 @@ def draw_angles():
             degree = sky_model.degrees[index_altitude, index_azimuth]
             draw_arrow(angle, (altitude, azimuth), int(1+5*degree))
 
-when = datetime.datetime.utcnow()
+if len(sys.argv) > 1:
+    when = datetime.datetime.strptime(sys.argv[1], "%y%m%d")
+else:
+    when = datetime.datetime.utcnow()
+
 sunrise_time, sunset_time = sunrise_sunset(when)
 print("Sunrise: %s, Sunset %s" % (sunrise_time, sunset_time))
 day_length = sunset_time - sunrise_time
