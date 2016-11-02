@@ -87,26 +87,34 @@ class SkyModelGenerator:
         gamma = self.get_gamma(local_point_radians)
         return self.max_degree * pow(np.sin(gamma), 2) / (1 + pow(np.cos(gamma), 2))
 
+    def is_left_of_the_sun_antisun_split(self, observed_radians):
+        sun_azimuth = self.sun[1]
+        observed_azimuth = observed_radians[1]
+        anti_sun_azimuth = (sun_azimuth + np.pi) % (2*np.pi)
+
+        if anti_sun_azimuth > np.pi: 
+            return observed_azimuth > sun_azimuth and observed_azimuth < anti_sun_azimuth
+        else:
+            return (observed_azimuth > sun_azimuth and observed_azimuth < 2*np.pi) or observed_azimuth < anti_sun_azimuth
+
     def get_angle(self, point_radians):
         local_point_radians = self.to_local(point_radians)
         cartesian_sun, cartesian_zenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.zenith, local_point_radians])]
 
-        angle_vector = self.get_angle_vector(local_point_radians)
+        angle_vector = self.get_angle_vector(point_radians)
         vertical_plane_normal = np.cross(cartesian_zenith, cartesian_observed)
 
         angle = angle_between(vertical_plane_normal, angle_vector)
-
-        sun_azimuth = self.sun[1]
-        observed_azimuth = local_point_radians[1]
-         
+        
         #TODO understand why this is necessary
-        if observed_azimuth > sun_azimuth:
+        if self.is_left_of_the_sun_antisun_split(local_point_radians):
             angle = -angle
-
+       
         return self.to_world(angle)
     
     # useful for 3d plotting
-    def get_angle_vector(self, local_point_radians):
+    def get_angle_vector(self, point_radians):
+        local_point_radians = self.to_local(point_radians)
         cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, local_point_radians])]
         orthogonal = np.cross(cartesian_sun, cartesian_observed)
         if np.isclose(np.linalg.norm(orthogonal), 0):
