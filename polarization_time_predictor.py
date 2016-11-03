@@ -117,8 +117,8 @@ def predict(model, datetime, yaw=0):
 
     return delta_time
 
-def timedelta_to_minutes(timedelta):
-    return timedelta.total_seconds()/60
+def timedelta_to_hours(timedelta):
+    return timedelta.total_seconds()//3600
 
 if __name__ == "__main__":
     today = datetime.datetime.utcnow().date()
@@ -159,13 +159,18 @@ if __name__ == "__main__":
     if test:
         print("Testing starting from %s %s for %d minutes each day" % (test_date, test_time, test_minutes))
         date = datetime.datetime.combine(test_date, test_time)
+        df = pd.DataFrame()
         for days in range(test_days):
-            prediction_errors = []
+            prediction_errors = pd.Series()
             day = date + datetime.timedelta(days=days)
-            for minutes in range(0, test_minutes, 10):
-                for yaw in np.arange(0, np.pi*2, np.pi/5):
-                    prediction_error = predict(model, day + datetime.timedelta(minutes=minutes), yaw)
-                    prediction_errors.append(prediction_error)
-            prediction_errors_minutes = [*map(timedelta_to_minutes, prediction_errors)]
-            print ("%s error mean %s median %s" % (day.date(), np.mean(prediction_errors_minutes), np.median(prediction_errors_minutes)))
+            for minutes in range(0, test_minutes, 30):
+                yaw_errors = []
+                day_time = day + datetime.timedelta(minutes=minutes)
+                for yaw in np.arange(0, np.pi*2, 2*np.pi/5):
+                    yaw_errors.append(predict(model, day_time, yaw))
+                yaw_errors_hours = [*map(timedelta_to_hours, yaw_errors)]
+                prediction_errors = prediction_errors.append(pd.Series(np.median(yaw_errors_hours), index=[day_time.time()]))
+            df.loc[:, day.date()] = prediction_errors
+            print ("%s error mean %s median %s" % (day.date(), np.mean(prediction_errors), np.median(prediction_errors)))
 
+        df.to_csv('df.csv')

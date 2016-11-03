@@ -146,8 +146,6 @@ def draw_predictors(predictors):
     for polar, parameter in zip(predictors[0], normalized_parameters):
         pygame.draw.circle(windowSurfaceObj, redColor, cartesian2d(polar), int(10*parameter), 0)
 
-    #pygame.draw.circle(windowSurfaceObj, blueColor, cartesian2d(sun_at), 20, 0)
-
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
