@@ -89,13 +89,15 @@ class SkyModelGenerator:
 
     def is_left_of_the_sun_antisun_split(self, observed_radians):
         sun_azimuth = self.sun[1]
+        normalized_sun_azimuth = self.sun[1] % (2*np.pi)
         observed_azimuth = observed_radians[1]
-        anti_sun_azimuth = (sun_azimuth + np.pi) % (2*np.pi)
+        normalized_observed_azimuth = observed_azimuth % (2*np.pi)
+        anti_sun_azimuth = (normalized_sun_azimuth + np.pi) % (2*np.pi)
 
         if anti_sun_azimuth > np.pi: 
-            return observed_azimuth > sun_azimuth and observed_azimuth < anti_sun_azimuth
+            return normalized_observed_azimuth > normalized_sun_azimuth and normalized_observed_azimuth < anti_sun_azimuth
         else:
-            return (observed_azimuth > sun_azimuth and observed_azimuth < 2*np.pi) or observed_azimuth < anti_sun_azimuth
+            return (normalized_observed_azimuth > normalized_sun_azimuth and normalized_observed_azimuth < 2*np.pi) or normalized_observed_azimuth < anti_sun_azimuth
 
     def get_angle(self, point_radians):
         local_point_radians = self.to_local(point_radians)
