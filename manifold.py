@@ -4,18 +4,36 @@ import sun_calculator as sc
 from features.sky_model import SkyModelGenerator as smg
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import argparse
+
+parser = argparse.ArgumentParser(description='Display manifold of the polarized sky')
+parser.add_argument('--start', default='160801 00:00')
+parser.add_argument('--end', default='160802 00:00')
+parser.add_argument('--freq', default="1H")
+
+args = parser.parse_args()
+start = datetime.datetime.strptime(args.start, '%y%m%d %H:%M')
+end = datetime.datetime.strptime(args.end, '%y%m%d %H:%M')
+freq = args.freq
 
 def sky_model_for_day(day):
         return smg(sc.sun_position(day), yaw=0).generate()
 
-day = datetime.datetime.strptime('160801 10:00', '%y%m%d %H:%M')
+date_range = pd.date_range(start, end, freq=freq)
+angles = pd.DataFrame()
+for date in date_range:
+    angles.loc[:, date] = pd.Series(sky_model_for_day(date).angles.flatten())
 
-month_angles = []
-for n in range(30):
-    month_angles.append(sky_model_for_day(day + datetime.timedelta(hours=n)).angles.flatten())
+angles = angles.T
 
 mds = manifold.MDS(n_components=2)
-X_projected = mds.fit_transform(month_angles)
+X_projected = mds.fit_transform(angles)
 
-plt.scatter(X_projected[:,0], X_projected[:,1], color=plt.cm.cubehelix(np.linspace(0,1,n)))
+plt.figure()
+for index, (x, y) in enumerate(X_projected):
+    name = angles.index[index].strftime('%d.%m %Hh')
+    plt.scatter([x], [y])
+    plt.text(x, y, name, color=(0,0,0), fontdict={'weight': 'bold', 'size': 10})
+
 plt.show()
