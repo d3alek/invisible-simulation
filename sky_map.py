@@ -105,7 +105,7 @@ def draw_angle_arrow(angle_rad, radians, yaw_radians, width=1, with_text=False):
         windowSurfaceObj.blit(renderedFont, rect)
 
 def draw_looking_at(yaw_degrees):
-    arrow = draw_arrow(redColor, 3, 90-yaw_degrees)
+    arrow = draw_arrow(redColor, 3, 90+yaw_degrees)
     rect = arrow.get_rect(center=CENTER)
     windowSurfaceObj.blit(arrow, rect)
 
