@@ -6,13 +6,13 @@ Observer is facing north and looking up straight at the zenith. This means that:
 """
 
 import pygame, sys
-from features.sky_model import SkyModelGenerator
+from features.sky_model import SkyModelGenerator, LocalPolar
 import numpy as np
 from pygame.locals import *
 import ipdb
 
 import datetime
-from sun_calculator import sunrise_sunset, sun_position
+from features.sun_calculator import sunrise_sunset, sun_position
 
 pygame.init()
 fpsClock = pygame.time.Clock()
@@ -72,8 +72,8 @@ def cartesian2d(polar):
 
     return np.int32(CENTER + cartesian * np.array([RADIUS, RADIUS]))
 
-def draw_sun(sky_model_generator):
-    pygame.draw.circle(windowSurfaceObj, yellowColor, cartesian2d(sky_model_generator.get_sun_polar()), 20, 0)
+def draw_sun(sky_model_generator, sun_position):
+    pygame.draw.circle(windowSurfaceObj, yellowColor, cartesian2d(sky_model_generator.sun), 20, 0)
 
 def draw_arrow(color, width, rotated=0):
     arrow=pygame.Surface((20,20)) # square so that the engine does not cut the image due to rounding
@@ -91,9 +91,8 @@ def draw_angle_arrow(angle_rad, radians, yaw_radians, width=1, with_text=False):
 
     # necessary because each point's angle is calculated as if observer is looking towards that point
     # but in the visualization observer is assumed to be looking at yaw
-    rotate = np.rad2deg(angle_rad - azimuth - yaw_radians)
+    rotate = np.rad2deg(angle_rad - azimuth)
     arrow = draw_arrow(whiteColor, width, rotated=rotate)
-
 
     rect = arrow.get_rect(center=pos)
     windowSurfaceObj.blit(arrow, rect)
@@ -133,10 +132,11 @@ print("Day length is %d:%02d hours" % (hours, minutes))
 sun_at = sun_position(sunrise_time)
 mouse_down = False
 
-def print_angle_and_degree_at(sky_map_coordinates):
+def print_angle_and_degree_at(sky_map_coordinates, yaw):
     observed = polar(sky_map_coordinates)
-    sky_model_generator = SkyModelGenerator(sun_at)
-    print("Observed: %s Angle: %f Degree %f" % (np.rad2deg(observed), np.rad2deg(sky_model_generator.get_angle(observed)), sky_model_generator.get_degree(observed)))
+    sky_model_generator = SkyModelGenerator(sun_at, yaw=yaw)
+    sky_model_local_observed = LocalPolar.from_tuple(observed)
+    print("Observed: %s Angle: %f Degree %f" % ([*map(np.rad2deg, sky_model_local_observed)], np.rad2deg(sky_model_generator.get_angle(sky_model_local_observed)), sky_model_generator.get_degree(sky_model_local_observed)))
 
 def normalize(array):
     return (array - array.min())/(array.max() - array.min())
@@ -168,7 +168,7 @@ if __name__ == "__main__":
             elif event.type == MOUSEBUTTONUP:
                 mouse_down = False
                 if not moved:
-                    print_angle_and_degree_at(event.pos)
+                    print_angle_and_degree_at(event.pos, np.deg2rad(yaw))
             elif event.type == MOUSEMOTION:
                 mousex, mousey = event.pos
                 if mouse_down:
@@ -189,12 +189,14 @@ if __name__ == "__main__":
                     print("Show degree predictors: %s" % show_degree_predictors)
                 if event.key == K_LEFT:
                     yaw += 10
+                    print("Yaw: %d" % yaw)
                 if event.key == K_RIGHT:
                     yaw -= 10
+                    print("Yaw: %d" % yaw)
 
         sky_model_generator = SkyModelGenerator(sun_at, yaw=np.deg2rad(yaw))
         draw_angles(sky_model_generator)
-        draw_sun(sky_model_generator)
+        draw_sun(sky_model_generator, sun_at)
         draw_looking_at(yaw)
 
         if show_predictors:
