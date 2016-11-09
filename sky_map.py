@@ -14,6 +14,8 @@ import ipdb
 import datetime
 from features.sun_calculator import sunrise_sunset, sun_position
 
+import features.viewers as viewers
+
 pygame.init()
 fpsClock = pygame.time.Clock()
 
@@ -35,9 +37,6 @@ redColor = pygame.Color(255, 0, 0)
 yellowColor = pygame.Color(255, 255, 0)
 
 sun_at = EAST
-ten_degrees_in_radians = np.pi/18
-observed_azimuths = np.arange(2*np.pi, step=ten_degrees_in_radians)
-observed_altitudes = np.arange(np.pi/2, step = ten_degrees_in_radians)
 
 def polar(sky_map_coordinates):
     """Opposite of cartesian2d. For some reason this doctest does not execute
@@ -110,12 +109,11 @@ def draw_looking_at(yaw_degrees):
     windowSurfaceObj.blit(arrow, rect)
 
 def draw_angles(sky_model_generator):
-    sky_model = sky_model_generator.generate(observed_altitudes, observed_azimuths)
-    for index_altitude, altitude in enumerate(observed_altitudes):
-        for index_azimuth, azimuth in enumerate(observed_azimuths):
-            angle = sky_model.angles[index_altitude, index_azimuth]
-            degree = sky_model.degrees[index_altitude, index_azimuth]
-            draw_angle_arrow(angle, (altitude, azimuth), sky_model_generator.yaw, int(1+5*degree))
+    sky_model = sky_model_generator.generate(observed_polar=viewers.vertical_strip_viewer())
+    for index, (altitude, azimuth) in enumerate(sky_model.observed_polar):
+        angle = sky_model.angles[index]
+        degree = sky_model.degrees[index]
+        draw_angle_arrow(angle, (altitude, azimuth), sky_model.yaw, int(1+5*degree))
 
 if len(sys.argv) > 1:
     when = datetime.datetime.strptime(sys.argv[1], "%y%m%d")

@@ -1,5 +1,4 @@
 import numpy as np
-import ipdb
 # using the horizontal celestrial coordinate system https://en.wikipedia.org/wiki/Horizontal_coordinate_system
 # this means we have two coordinates: 
 # - altitude - elevation (0-90)
@@ -132,22 +131,19 @@ class SkyModelGenerator:
 
         return orthogonal
 
-    def generate(self, observed_altitudes = DEFAULT_OBSERVED_ALTITUDES, observed_azimuths = DEFAULT_OBSERVED_AZIMUTHS):
-        azimuths, altitudes = np.meshgrid(observed_azimuths, observed_altitudes)
+    def generate(self, observed_polar):
+        angle_vectors = []
+        angles = []
+        degrees = []
 
-        angle_vectors = np.empty(azimuths.shape, dtype=list)
-        angles = np.empty(azimuths.shape)
-        degrees = np.empty(azimuths.shape)
+        for altitude, azimuth in observed_polar:
+            angle_vectors.append(self.get_angle_vector(LocalPolar(altitude, azimuth)))
+            angles.append(self.get_angle(LocalPolar(altitude, azimuth)))
+            degrees.append(self.get_degree(LocalPolar(altitude, azimuth)))
 
-        for azimuth_index, azimuth in enumerate(observed_azimuths):
-            for altitude_index, altitude in enumerate(observed_altitudes):
-                angle_vectors[altitude_index, azimuth_index] = self.get_angle_vector(LocalPolar(altitude, azimuth)) 
-                angles[altitude_index, azimuth_index] = self.get_angle(LocalPolar(altitude, azimuth)) 
-                degrees[altitude_index, azimuth_index] = self.get_degree(LocalPolar(altitude, azimuth))
-
-        cartesian = map(to_cartesian, map(LocalPolar.from_tuple, zip(altitudes, azimuths)))
+        cartesian = map(to_cartesian, map(LocalPolar.from_tuple, observed_polar))
         x, y, z = zip(*cartesian)
-        return SkyModel(observed_azimuths, observed_altitudes, x, y, z, angles, angle_vectors, degrees)
+        return SkyModel(observed_polar, x, y, z, np.array(angles), np.array(angle_vectors), np.array(degrees), self.yaw)
 
     def to_world(self, polar):
         if np.isscalar(polar):
@@ -162,15 +158,15 @@ class SkyModelGenerator:
             return rotate_yaw(polar, -self.yaw)
 
 class SkyModel:
-    def __init__(self, observed_azimuths, observed_altitudes, x, y, z, angles, angle_vectors, degrees):
-        self.observed_azimuths = observed_azimuths
-        self.observed_altitudes = observed_altitudes
+    def __init__(self, observed_polar, x, y, z, angles, angle_vectors, degrees, yaw):
+        self.observed_polar = observed_polar
         self.x = x
         self.y = y
         self.z = z
         self.angles = angles
         self.angle_vectors = angle_vectors
         self.degrees = degrees
+        self.yaw = yaw
 
 def test_sunset_sunrise():
     print("Testing whether sunset looks like sunrise when we yaw")
@@ -179,10 +175,12 @@ def test_sunset_sunrise():
     date = datetime.datetime.strptime("160801 08:00", '%y%m%d %H:%M')
     sunrise, sunset = sunrise_sunset(date)
 
-    sunrise_angles = SkyModelGenerator(sun_position(sunrise)).generate().angles.flatten()
+    import viewers
+    observed_polar = observed_polar=viewers.uniform_viewer()
+    sunrise_angles = SkyModelGenerator(sun_position(sunrise)).generate(observed_polar).angles.flatten()
 
     for yaw in range(0, 360, 1):
-        sunset_angles = SkyModelGenerator(sun_position(sunset), yaw=np.deg2rad(yaw)).generate().angles.flatten()
+        sunset_angles = SkyModelGenerator(sun_position(sunset), yaw=np.deg2rad(yaw)).generate(observed_polar=viewers.uniform_viewer()).angles.flatten()
         diff = np.median((sunset_angles - sunrise_angles) % np.pi)
         if diff < 0.1:
             print("Sunset looks like sunrise when we yaw %s degrees" % yaw)
