@@ -54,15 +54,16 @@ colors = []
 for yaw_num, yaw in enumerate(yaw_range):
     for num, date in enumerate(date_range):
         index = ','.join([date.strftime('%d.%m %Hh'), str(yaw)])
-        angles.loc[:, index] = pd.Series(sky_model(date, yaw).angles.flatten())
+        angles.loc[:, index] = pd.Series(np.abs(np.sin(sky_model(date, yaw).angles.flatten())))
         degrees.loc[:, index] = pd.Series(sky_model(date, yaw).degrees.flatten())
         colors.append(cmap[num])
 
 names = angles.T.index
 
-angles_degrees = angles.T
-angles_degrees[degrees.T<const] = 0
-angles_degrees = preprocessing.scale(angles_degrees)
+#angles_degrees = angles.T
+#angles_degrees[degrees.T<const] = 0
+#angles_degrees = preprocessing.scale(angles_degrees)
+angles_degrees = preprocessing.scale(angles.append(degrees).T)
 
 angles = preprocessing.scale(angles.T)
 degrees = preprocessing.scale(degrees.T)

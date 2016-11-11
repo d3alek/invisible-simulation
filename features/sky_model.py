@@ -132,14 +132,30 @@ class SkyModelGenerator:
         return orthogonal
 
     def generate(self, observed_polar):
+        """ 
+        Returns a sky model which assumes that the observer looks at *self.yaw*.
+        The angles at the observed points are calibrated with this in mind. 
+        If an observed point is at an angle *azimuth* from 0, the angle will be
+        *angle0* - *azimuth*, where angle0 is calculated as if observer is looking at this point.
+
+        The returned angles are always normalized in the range [0, pi].
+        The returned degrees are in the range [0, self.max_degree].
+        """
         angle_vectors = []
         angles = []
         degrees = []
 
         for altitude, azimuth in observed_polar:
             angle_vectors.append(self.get_angle_vector(LocalPolar(altitude, azimuth)))
-            angles.append(self.get_angle(LocalPolar(altitude, azimuth)))
-            degrees.append(self.get_degree(LocalPolar(altitude, azimuth)))
+
+            # necessary to subtract azimuth because each point's angle is calculated 
+            # as if observer is looking towards that point we assume that observer is looking at 0
+            angle = (self.get_angle(LocalPolar(altitude, azimuth)) - azimuth) % np.pi
+            assert angle >= 0 and angle <= np.pi, "Angle should be in [0,pi] but is %s" % angle
+            angles.append(angle)
+            degree = self.get_degree(LocalPolar(altitude, azimuth))
+            assert degree >= 0 and degree <= self.max_degree, "Degree should be in [0,%s] but is %s" % (max_degree, degree)
+            degrees.append(degree)
 
         cartesian = map(to_cartesian, map(LocalPolar.from_tuple, observed_polar))
         x, y, z = zip(*cartesian)

@@ -90,7 +90,7 @@ def draw_angle_arrow(angle_rad, radians, yaw_radians, width=1, with_text=False):
 
     # necessary because each point's angle is calculated as if observer is looking towards that point
     # but in the visualization observer is assumed to be looking at yaw
-    rotate = np.rad2deg(angle_rad - azimuth)
+    rotate = np.rad2deg(angle_rad)
     arrow = draw_arrow(whiteColor, width, rotated=rotate)
 
     rect = arrow.get_rect(center=pos)
@@ -109,7 +109,7 @@ def draw_looking_at(yaw_degrees):
     windowSurfaceObj.blit(arrow, rect)
 
 def draw_angles(sky_model_generator):
-    sky_model = sky_model_generator.generate(observed_polar=viewers.vertical_strip_viewer())
+    sky_model = sky_model_generator.generate(observed_polar=viewers.uniform_viewer())#viewers.vertical_strip_viewer())
     for index, (altitude, azimuth) in enumerate(sky_model.observed_polar):
         angle = sky_model.angles[index]
         degree = sky_model.degrees[index]

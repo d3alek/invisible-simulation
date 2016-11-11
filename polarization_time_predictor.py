@@ -6,7 +6,7 @@ import numpy as np
 import statsmodels.api as sm
 from patsy import dmatrices
 from features.sky_model import SkyModelGenerator
-from sun_calculator import sunrise_sunset, sun_position
+from features.sun_calculator import sunrise_sunset, sun_position
 import datetime
 
 import argparse
@@ -15,10 +15,9 @@ import pickle
 
 from ast import literal_eval as make_tuple
 
-store = pd.HDFStore('data/latest_polarization_time_predictor_data.h5')
+import features.viewers as viewers
 
-OBSERVED_ALTITUDES = np.arange(np.pi/2, step=np.pi/20)
-OBSERVED_AZIMUTHS = np.arange(2*np.pi, step=np.pi/5)
+store = pd.HDFStore('data/latest_polarization_time_predictor_data.h5')
 
 def generate_data(date, days, frequency_string, do_yaw):
     print("Generating data from %s for %d days at frequency %s" % (date, days, frequency_string))
@@ -46,9 +45,9 @@ def generate_data(date, days, frequency_string, do_yaw):
             print("Generating sky for day %s yaw %s" % (day, np.rad2deg(yaw)))
             for index, time in enumerate(time_samples):
                 time = time + datetime.timedelta(days=day)
-                sky_model = SkyModelGenerator(sun_position(time), yaw=yaw).generate(observed_altitudes = OBSERVED_ALTITUDES, observed_azimuths = OBSERVED_AZIMUTHS)
+                sky_model = SkyModelGenerator(sun_position(time), yaw=yaw).generate(observed_polar = viewers.uniform_viewer())
 
-                azimuths, altitudes = map(np.ndarray.flatten, np.meshgrid(sky_model.observed_azimuths, sky_model.observed_altitudes))
+                azimuths, altitudes = [*map(np.array, zip(*sky_model.observed_polar))]
                 angles = sky_model.angles.flatten()
                 degrees = sky_model.degrees.flatten()
 
@@ -88,6 +87,8 @@ def analyze_data(data):
     print(results.summary())
 
     params = results.params
+    import ipdb
+    ipdb.set_trace()
     angles = params[1:params.size//2] # skipping constant column added by sm
     degrees = params[params.size//2+1:]
 
@@ -98,7 +99,7 @@ def analyze_data(data):
     return results
 
 def predict(model, datetime, yaw=0):
-    sky_model = SkyModelGenerator(sun_position(datetime), yaw=yaw).generate(OBSERVED_ALTITUDES, OBSERVED_AZIMUTHS)
+    sky_model = SkyModelGenerator(sun_position(datetime), yaw=yaw).generate(observed_polar=viewers.uniform_viewer())
     angles = sky_model.angles.flatten()
     degrees = sky_model.degrees.flatten()
     angles_degrees = np.append(angles, degrees)
@@ -126,7 +127,7 @@ if __name__ == "__main__":
     parser.add_argument('--date', default=today.strftime('%y%m%d'), help="start date for training data generation")
     parser.add_argument('--days', metavar='N', type=int, default=10,
                                 help='the number of days to gather training data for')
-    parser.add_argument('--freq', default="10mins",
+    parser.add_argument('--freq', default="10min",
                                 help='how often to sample the time between sunset and sunrize (10mins, 1H, etc)')
     parser.add_argument('--load', action='store_true', default=False, help='load latest used data (default: calculate new data and save it as latest)')
     parser.add_argument('--yaw', default=False, help='should we include yaw in training')
