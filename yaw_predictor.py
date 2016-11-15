@@ -17,12 +17,26 @@ from ast import literal_eval as make_tuple
 
 import features.viewers as viewers
 
-store = pd.HDFStore('data/latest_yaw_predictor_data.h5')
+DATA_FILE_NAME = 'data/latest_yaw_predictor_data.csv'
 
 def angle_to_scalar(angle):
-    """ Transforms angle (0:2*pi) to scalar (0:1) loosing information about pi rotation to simulate real polarization camera result
-    and transform angle to the same scale as degree """
-    return np.abs(np.sin(angle))
+    """ Transforms angle to sin(angle) cos(ngle) pair to support good learning of periodic features"""
+    return np.array([np.sin(angle), np.cos(angle)])
+
+def to_series(name, sky_model):
+    azimuths, altitudes = [*map(np.array, zip(*sky_model.observed_polar))]
+    angles = np.array([*map(angle_to_scalar, sky_model.angles.flatten())])
+    degrees = sky_model.degrees.flatten()
+
+    #assert azimuths.shape == altitudes.shape and angles.shape == degrees.shape and azimuths.shape == degrees.shape
+
+    polar_coordinates = list(zip(*map(np.rad2deg, [altitudes, azimuths])))
+
+    angle_sin_series = pd.Series(angles[:,0], name=name, index=map(lambda a: 'As' + str(a), polar_coordinates))
+    angle_cos_series = pd.Series(angles[:,1], name=name, index=map(lambda a: 'Ac' + str(a), polar_coordinates))
+    degree_series = pd.Series(degrees, name=name, index=map(lambda d: 'D' + str(d), polar_coordinates))
+
+    return angle_sin_series.append(angle_cos_series).append(degree_series)
 
 def generate_data(date, days, hours, yaw_step):
     print("Generating data from %s for %d days at hours %s at %d degree step rotations" % (date, days, hours, np.rad2deg(yaw_step)))
@@ -41,29 +55,18 @@ def generate_data(date, days, hours, yaw_step):
             for time in time_samples:
                 time = time + datetime.timedelta(days=day)
                 sky_model = SkyModelGenerator(sun_position(time), yaw=yaw).generate(observed_polar = viewers.uniform_viewer())
-
-                azimuths, altitudes = [*map(np.array, zip(*sky_model.observed_polar))]
-                angles = np.array([*map(angle_to_scalar, sky_model.angles.flatten())])
-                degrees = sky_model.degrees.flatten()
-
-                assert azimuths.shape == altitudes.shape and angles.shape == degrees.shape and azimuths.shape == degrees.shape
-
-                polar_coordinates = list(zip(*map(np.rad2deg, [altitudes, azimuths])))
-
-                angle_df = pd.DataFrame(angles, index=map(lambda a: 'A' + str(a), polar_coordinates), columns=[time]).T
-                degree_df = pd.DataFrame(degrees, index=map(lambda d: 'D' + str(d), polar_coordinates), columns=[time]).T
-
-                df = angle_df.join(degree_df)
-                df.loc[:, 'time'] = pd.Series([time], index=df.index)
-                df.loc[:, 'yaw'] = pd.Series([yaw], index=df.index)
+                name = ' '.join(map(str, [time, yaw]))
+                s = to_series(name, sky_model)
+                s = s.append(pd.Series([time], name=name, index=['time']))
+                s = s.append(pd.Series([yaw], name=name, index=['yaw']))
 
                 if data is not None:
-                    data = data.append(df)
+                    data = data.append(s)
                 else: 
-                    data = df
+                    data = pd.DataFrame([s], index=[name])
         print()
 
-    store['data'] = data
+    data.to_csv(DATA_FILE_NAME)
     print("Stored data")
     return data
 
@@ -88,16 +91,12 @@ def analyze_data(data):
 
     return clf
 
-def predict(classifier, datetime, yaw, yaws, sky_sample_points = None):
+def predict(classifier, datetime, yaw, yaws):
     sky_model = SkyModelGenerator(sun_position(datetime), yaw=yaw).generate(observed_polar=viewers.uniform_viewer())
-    angles = sky_model.angles.flatten()
-    degrees = sky_model.degrees.flatten()
-    angles_degrees = np.append(angles, degrees)
-    if sky_sample_points is not None:
-        angles_degrees = angles_degrees[sky_sample_points]
-    angles_degrees = angles_degrees.reshape(1,-1)
-    prediction_degrees = classifier.predict(angles_degrees)[0]
-    print("Prediction is %s should be %s" % (prediction_degrees, np.rad2deg(yaw)))
+    s = to_series(datetime, sky_model)
+    s = s.reshape(1,-1)
+    prediction_degrees = classifier.predict(s)[0]
+    print("Prediction for %s is %s should be %s" % (datetime, prediction_degrees, np.rad2deg(yaw)))
     return (yaw - np.deg2rad(prediction_degrees)) % (2*np.pi)
 
 if __name__ == "__main__":
@@ -114,7 +113,6 @@ if __name__ == "__main__":
     parser.add_argument('--load-training', action='store_true', default=False, help='load latest used data (default: calculate new data and save it as latest)')
     parser.add_argument('--load-model', action='store_true', default=False, help='load latest used data (default: calculate new data and save it as latest)')
     parser.add_argument('--training-samples', type=int, default=0, help='use N random samples from training data')
-    parser.add_argument('--sky-samples', type=int, default=0, help='use N random samples from the sky')
     parser.add_argument('--test', action='store_true', help='should the model be evaluated')
     parser.add_argument('--test-date', default=today.strftime('%y%m%d'), help='date to start the test with')
     parser.add_argument('--test-days', default=10, type=int, help='how many days after the test date to test with')
@@ -130,7 +128,6 @@ if __name__ == "__main__":
     load_training = args.load_training
     load_model = args.load_model
     training_samples = args.training_samples
-    sky_samples = args.sky_samples
     test = args.test
     test_date = datetime.datetime.strptime(args.test_date, '%y%m%d').date()
     test_days = args.test_days
@@ -138,20 +135,12 @@ if __name__ == "__main__":
     test_yaw_step_degrees = args.test_yaw_step
 
     if load_training:
-        data = store['data']
+        data = pd.read_csv(DATA_FILE_NAME)
     else:
         data = generate_data(date, days, hours, np.deg2rad(yaw_step_degrees))
 
     if training_samples != 0:
         data = data.sample(training_samples)
-
-    if sky_samples != 0:
-        sky_sample_points = sorted(random.sample(range(data.columns.size-1), sky_samples))
-        sky_sample_points.append(data.columns.size-1) # adding yaw column
-        data = data.iloc[:, sky_sample_points]
-        sky_sample_points = sky_sample_points[:-1] # removing yaw column
-    else: 
-        sky_sample_points = None
 
     if load_model:
         classifier = pickle.load(open('data/yaw_classifier.pickle','rb'))
@@ -174,7 +163,7 @@ if __name__ == "__main__":
                 day_time = time + datetime.timedelta(days=days)
                 yaw_errors = []
                 for yaw in np.arange(0, np.pi*2, np.deg2rad(test_yaw_step_degrees)):
-                    yaw_errors.append(np.rad2deg(predict(classifier, day_time, yaw, yaws, sky_sample_points)))
+                    yaw_errors.append(np.rad2deg(predict(classifier, day_time, yaw, yaws)))
                 prediction_errors = prediction_errors.append(pd.Series(np.median(yaw_errors), index=[day_time.time()]))
             df.loc[:, date] = prediction_errors
             print ("%s error mean %s median %s" % (date, np.mean(prediction_errors), np.median(prediction_errors)))
