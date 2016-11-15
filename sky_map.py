@@ -88,8 +88,6 @@ def draw_angle_arrow(angle_rad, radians, yaw_radians, width=1, with_text=False):
     azimuth = radians[1]
     pos = cartesian2d(radians)
 
-    # necessary because each point's angle is calculated as if observer is looking towards that point
-    # but in the visualization observer is assumed to be looking at yaw
     rotate = np.rad2deg(angle_rad)
     arrow = draw_arrow(whiteColor, width, rotated=rotate)
 
