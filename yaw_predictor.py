@@ -8,6 +8,7 @@ from features.sky_model import SkyModelGenerator
 from features.sun_calculator import sunrise_sunset, sun_position
 import datetime
 import random
+from sklearn.model_selection import cross_val_score
 
 import argparse
 
@@ -79,21 +80,21 @@ def save_model(model):
     pickle.dump(model, open('data/yaw_classifier.pickle','wb'))
 
 def analyze_data(data):
-    yaws = data['yaw'].values # y
-    yaws_index = [*map(int, map(np.rad2deg, yaws))]
-    exog = data.loc[:, data.columns[:-1]] # X, without yaw
-    if exog.columns[-1] == "time":
-        exog = exog.loc[:, exog.columns[:-1]]
-    exog = exog.values
+    yaws = data['yaw'].values 
+    yaws_degrees = [*map(int, map(np.rad2deg, yaws))] # y
+    exog = data.loc[:, data.columns[:-1]] # without yaw
+    if exog.columns[-1] == "time": # without time
+        exog = exog.loc[:, exog.columns[:-1]] 
+    exog = exog.values # X
     clf = svm.LinearSVC()
     print("Fitting...", flush=True)
-    print(clf.fit(exog, yaws_index))
+    print(clf.fit(exog, yaws_degrees))
 
     save_model(clf)
 
     return clf
 
-def predict(classifier, datetime, yaw, yaws):
+def predict(classifier, datetime, yaw):
     sky_model = SkyModelGenerator(sun_position(datetime), yaw=yaw).generate(observed_polar=viewers.uniform_viewer())
     s = to_series(datetime, sky_model)
     s = s.values.reshape(1,-1)
@@ -106,6 +107,18 @@ def plot_data(df, axis = 0):
     plt.show()
     plt.figure(); df.median(axis=axis).plot(); plt.legend(loc='best')
     plt.show()
+
+def parse_X(data):
+    exog = data.loc[:, data.columns[:-1]] # without yaw
+    if exog.columns[-1] == "time": # without time
+        exog = exog.loc[:, exog.columns[:-1]] 
+    exog = exog.values # X
+    return exog
+
+def parse_y(data):
+    yaws = data['yaw'].values
+    yaws_degrees = np.array([*map(int, map(np.rad2deg, yaws))]) # y
+    return yaws_degrees
 
 if __name__ == "__main__":
     today = datetime.datetime.utcnow().date()
@@ -123,10 +136,6 @@ if __name__ == "__main__":
     parser.add_argument('--training-samples', type=int, default=0, help='use N random samples from training data')
     parser.add_argument('--test', action='store_true', help='should the model be evaluated')
     parser.add_argument('--plot', action='store_true', help='should the evaluation be plotted')
-    parser.add_argument('--test-date', default=today.strftime('%y%m%d'), help='date to start the test with')
-    parser.add_argument('--test-days', default=10, type=int, help='how many days after the test date to test with')
-    parser.add_argument('--test-hours', type=int, action='append',  help='hours of day to test at')
-    parser.add_argument('--test-yaw-step', type=int, default=10,  help='test rotational step')
 
     args = parser.parse_args()
 
@@ -138,13 +147,9 @@ if __name__ == "__main__":
     load_model = args.load_model
     test = args.test
     plot = args.plot
-    test_date = datetime.datetime.strptime(args.test_date, '%y%m%d').date()
-    test_days = args.test_days
-    test_hours = args.test_hours
-    test_yaw_step_degrees = args.test_yaw_step
 
     if load_training:
-        data = pd.read_csv(DATA_FILE_NAME)
+        data = pd.read_csv(DATA_FILE_NAME, index_col=0, parse_dates=True)
     else:
         data = generate_data(date, days, hours, np.deg2rad(yaw_step_degrees))
 
@@ -154,28 +159,8 @@ if __name__ == "__main__":
         classifier = analyze_data(data)
 
     if test:
-        print("Testing for %d days from %s at %s each day, rotating at %d steps" % (test_days, test_date, test_hours, test_yaw_step_degrees))
-        df = pd.DataFrame()
+        print("Cross validation...")
+        clf = svm.LinearSVC()
+        scores = cross_val_score(clf, parse_X(data), parse_y(data), cv=5, n_jobs=-1)
+        print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 
-        yaws = data['yaw'].values
-        time_samples = []
-        for hour in test_hours:
-            time_samples.append(datetime.datetime.combine(test_date, datetime.time(hour, 0)))
-
-        for days in range(test_days):
-            prediction_errors = pd.Series()
-            date = test_date + datetime.timedelta(days=days)
-            for time in time_samples:
-                day_time = time + datetime.timedelta(days=days)
-                yaw_errors = []
-                for yaw in np.arange(0, np.pi*2, np.deg2rad(test_yaw_step_degrees)):
-                    yaw_errors.append(np.rad2deg(predict(classifier, day_time, yaw, yaws)))
-                prediction_errors = prediction_errors.append(pd.Series(np.median(yaw_errors), index=[day_time.time()]))
-            df.loc[:, date] = prediction_errors
-            print ("%s error mean %s median %s" % (date, np.mean(prediction_errors), np.median(prediction_errors)))
-
-        df.to_csv('test.csv')
-
-    if plot:
-        df = pd.read_csv('test.csv', index_col=0, parse_dates=True)
-        plot_data(df)
