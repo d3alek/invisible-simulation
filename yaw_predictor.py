@@ -4,6 +4,7 @@
 import pandas as pd
 import numpy as np
 from sklearn import svm
+from sklearn import linear_model
 from features.sky_model import SkyModelGenerator
 from features.sun_calculator import sunrise_sunset, sun_position
 import datetime
@@ -117,8 +118,9 @@ def parse_X(data):
 
 def parse_y(data):
     yaws = data['yaw'].values
-    yaws_degrees = np.array([*map(int, map(np.rad2deg, yaws))]) # y
-    return yaws_degrees
+    #yaws_degrees = np.array([*map(int, map(np.rad2deg, yaws))]) # y
+    #return yaws_degrees
+    return np.array([*map(angle_to_scalar, yaws)])
 
 if __name__ == "__main__":
     today = datetime.datetime.utcnow().date()
@@ -132,7 +134,6 @@ if __name__ == "__main__":
                                 help='rotational step in degrees')
 
     parser.add_argument('--load-training', action='store_true', default=False, help='load latest used data (default: calculate new data and save it as latest)')
-    parser.add_argument('--load-model', action='store_true', default=False, help='load latest used data (default: calculate new data and save it as latest)')
     parser.add_argument('--training-samples', type=int, default=0, help='use N random samples from training data')
     parser.add_argument('--test', action='store_true', help='should the model be evaluated')
     parser.add_argument('--plot', action='store_true', help='should the evaluation be plotted')
@@ -144,7 +145,6 @@ if __name__ == "__main__":
     hours = args.hours
     yaw_step_degrees = args.yaw_step
     load_training = args.load_training
-    load_model = args.load_model
     test = args.test
     plot = args.plot
 
@@ -153,14 +153,10 @@ if __name__ == "__main__":
     else:
         data = generate_data(date, days, hours, np.deg2rad(yaw_step_degrees))
 
-    if load_model:
-        classifier = pickle.load(open('data/yaw_classifier.pickle','rb'))
-    else: 
-        classifier = analyze_data(data)
-
     if test:
         print("Cross validation...")
-        clf = svm.LinearSVC()
-        scores = cross_val_score(clf, parse_X(data), parse_y(data), cv=5, n_jobs=-1)
+        clf = linear_model.MultiTaskLasso()
+        #clf = svm.SVR()
+        scores = cross_val_score(clf, parse_X(data), parse_y(data), cv=5, n_jobs=-1, scoring='neg_mean_absolute_error'); print(scores)
         print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 
