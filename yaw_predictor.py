@@ -17,6 +17,8 @@ from ast import literal_eval as make_tuple
 
 import features.viewers as viewers
 
+from matplotlib import pyplot as plt
+
 DATA_FILE_NAME = 'data/latest_yaw_predictor_data.csv'
 
 def angle_to_scalar(angle):
@@ -94,10 +96,16 @@ def analyze_data(data):
 def predict(classifier, datetime, yaw, yaws):
     sky_model = SkyModelGenerator(sun_position(datetime), yaw=yaw).generate(observed_polar=viewers.uniform_viewer())
     s = to_series(datetime, sky_model)
-    s = s.reshape(1,-1)
+    s = s.values.reshape(1,-1)
     prediction_degrees = classifier.predict(s)[0]
-    print("Prediction for %s is %s should be %s" % (datetime, prediction_degrees, np.rad2deg(yaw)))
+    #print("Prediction for %s is %s should be %s" % (datetime, prediction_degrees, np.rad2deg(yaw)))
     return (yaw - np.deg2rad(prediction_degrees)) % (2*np.pi)
+
+def plot_data(df, axis = 0):
+    plt.figure(); df.mean(axis=axis).plot(); plt.legend(loc='best')
+    plt.show()
+    plt.figure(); df.median(axis=axis).plot(); plt.legend(loc='best')
+    plt.show()
 
 if __name__ == "__main__":
     today = datetime.datetime.utcnow().date()
@@ -114,6 +122,7 @@ if __name__ == "__main__":
     parser.add_argument('--load-model', action='store_true', default=False, help='load latest used data (default: calculate new data and save it as latest)')
     parser.add_argument('--training-samples', type=int, default=0, help='use N random samples from training data')
     parser.add_argument('--test', action='store_true', help='should the model be evaluated')
+    parser.add_argument('--plot', action='store_true', help='should the evaluation be plotted')
     parser.add_argument('--test-date', default=today.strftime('%y%m%d'), help='date to start the test with')
     parser.add_argument('--test-days', default=10, type=int, help='how many days after the test date to test with')
     parser.add_argument('--test-hours', type=int, action='append',  help='hours of day to test at')
@@ -127,8 +136,8 @@ if __name__ == "__main__":
     yaw_step_degrees = args.yaw_step
     load_training = args.load_training
     load_model = args.load_model
-    training_samples = args.training_samples
     test = args.test
+    plot = args.plot
     test_date = datetime.datetime.strptime(args.test_date, '%y%m%d').date()
     test_days = args.test_days
     test_hours = args.test_hours
@@ -138,9 +147,6 @@ if __name__ == "__main__":
         data = pd.read_csv(DATA_FILE_NAME)
     else:
         data = generate_data(date, days, hours, np.deg2rad(yaw_step_degrees))
-
-    if training_samples != 0:
-        data = data.sample(training_samples)
 
     if load_model:
         classifier = pickle.load(open('data/yaw_classifier.pickle','rb'))
@@ -168,4 +174,8 @@ if __name__ == "__main__":
             df.loc[:, date] = prediction_errors
             print ("%s error mean %s median %s" % (date, np.mean(prediction_errors), np.median(prediction_errors)))
 
-        df.to_csv('df.csv')
+        df.to_csv('test.csv')
+
+    if plot:
+        df = pd.read_csv('test.csv', index_col=0, parse_dates=True)
+        plot_data(df)
