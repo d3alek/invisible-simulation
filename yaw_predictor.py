@@ -132,11 +132,12 @@ if __name__ == "__main__":
                                 help='sample the sky at this hour each day (can be specified multiple times)')
     parser.add_argument('--yaw-step', type=int, default=10,
                                 help='rotational step in degrees')
-
+    parser.add_argument('--one-day', action='store_true', default=False, help='train on one day')
     parser.add_argument('--load-training', action='store_true', default=False, help='load latest used data (default: calculate new data and save it as latest)')
     parser.add_argument('--training-samples', type=int, default=0, help='use N random samples from training data')
     parser.add_argument('--test', action='store_true', help='should the model be evaluated')
     parser.add_argument('--plot', action='store_true', help='should the evaluation be plotted')
+    parser.add_argument('--classification', action='store_true', help='use classification instead of regression')
 
     args = parser.parse_args()
 
@@ -147,6 +148,7 @@ if __name__ == "__main__":
     load_training = args.load_training
     test = args.test
     plot = args.plot
+    classification = args.classification
 
     if load_training:
         data = pd.read_csv(DATA_FILE_NAME, index_col=0, parse_dates=True)
@@ -155,8 +157,12 @@ if __name__ == "__main__":
 
     if test:
         print("Cross validation...")
-        clf = linear_model.MultiTaskLasso()
-        #clf = svm.SVR()
+        if classification:
+            clf = svm.LinearSVC()
+        else:
+            clf = linear_model.MultiTaskLasso()
         scores = cross_val_score(clf, parse_X(data), parse_y(data), cv=5, n_jobs=-1, scoring='neg_mean_absolute_error'); print(scores)
+        clf = svm.SVR()
+        scores = cross_val_score(clf, parse_X(data), parse_y(data), cv=5, n_jobs=-1); print(scores)
         print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 
