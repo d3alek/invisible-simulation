@@ -9,7 +9,7 @@ from features.sun_calculator import sun_position
 import datetime
 import sky_generator
 import argparse
-import pickle
+import pickle 
 import features.viewers as viewers
 from matplotlib import pyplot as plt
 
@@ -24,13 +24,17 @@ figure_rows_cols = {
 def save_model(model):
     pickle.dump(model, open('data/yaw_classifier.pickle','wb'))
 
-def predict(classifier, datetime, yaw):
+def predict(classifier, datetime, yaw, polar):
     sky_model = SkyModelGenerator(sun_position(datetime), yaw=yaw).generate(observed_polar=viewers.uniform_viewer())
     s = sky_generator.to_series(datetime, sky_model) 
     assert not ('time' in s.index) and not ('yaw' in s.index) # only sin, cos and deg, should not include time and yaw
     s = s.values.reshape(1,-1)
     sin, cos = classifier.predict(s)[0]
-    return np.arctan2(sin, cos) % (2*np.pi) # arctan2 returns in the range [-np.pi : np.pi] so we transform it to [0: 2*np.pi]
+    angle = np.arctan2(sin, cos)
+    if not polar:
+        angle = angle % (2*np.pi)  # arctan2 returns in the range [-np.pi : np.pi] so we transform it to [0: 2*np.pi]
+
+    return angle
 
 def parse_X(data):
     exog = data.loc[:, data.columns[:-1]] # without yaw
@@ -46,10 +50,17 @@ def parse_y(data):
 def rad_to_int(radians):
     return np.vectorize(int)(np.round(np.rad2deg(radians)))
 
-def plot_expected_vs_actual(title, expected_yaws, actual_yaws, ax):
-    ax.plot(rad_to_int(expected_yaws), rad_to_int(actual_yaws))
-    ax.set_xlabel('expected')
-    ax.set_ylabel('actual')
+def plot_expected_vs_actual(title, expected_yaws, actual_yaws, ax, polar):
+    if not polar:
+        actual_yaws = rad_to_int(actual_yaws)
+        expected_yaws = rad_to_int(expected_yaws)
+        ax.plot(expected_yaws, actual_yaws)
+        ax.plot(expected_yaws, expected_yaws, color='r')
+    else:
+        ax.axes.get_yaxis().set_visible(False)
+        ax.plot(actual_yaws, expected_yaws)
+        ax.plot(expected_yaws, expected_yaws, color='r')
+
     ax.set_title(title)
 
 def class_to_name(object):
@@ -64,6 +75,9 @@ if __name__ == "__main__":
                                 help='sample the sky at this hour each day (can be specified multiple times)')
     parser.add_argument('--yaw-step', type=int, default=10,
                                 help='rotational step in degrees')
+    parser.add_argument('--polar', action="store_true", help='produce polar plot')
+
+
 
     args = parser.parse_args()
 
@@ -71,6 +85,7 @@ if __name__ == "__main__":
     date = datetime.datetime.strptime(args.date, '%y%m%d').date()
     hours = args.hours
     yaw_step_degrees = args.yaw_step
+    polar = args.polar
 
     data = pd.read_csv(training_file, index_col=0, parse_dates=True)
 
@@ -82,23 +97,27 @@ if __name__ == "__main__":
 
     date_midnight = datetime.datetime.combine(date, datetime.time(0,0))
     rows, cols = figure_rows_cols[len(hours)]
-    plt.figure()
-    fig, axes = plt.subplots(nrows=rows, ncols=cols)
+    if polar:
+        fig, axes = plt.subplots(subplot_kw=dict(polar=True, axisbg='none'), nrows=rows, ncols=cols)
+    else:
+        fig, axes = plt.subplots(nrows=rows, ncols=cols)
 
     flat_axes = np.array(axes).flatten()
     for number, hour in enumerate(hours):
         actual_yaws = []
         time = date_midnight + datetime.timedelta(hours=hour)
         for expected_yaw in expected_yaws:
-            actual_yaws.append(predict(reg, time, expected_yaw))
+            actual_yaws.append(predict(reg, time, expected_yaw, polar))
         assert len(expected_yaws) == len(actual_yaws)
-        plot_expected_vs_actual(str(time), expected_yaws, np.array(actual_yaws), flat_axes[number])
+        plot_expected_vs_actual(str(time), expected_yaws, np.array(actual_yaws), flat_axes[number], polar)
 
     title = class_to_name(reg) + " on " + training_file.split('/')[-1].split('.')[0]
+    if polar:
+        title = title + " polar"
+
     fig.suptitle(title, size=16)
 
-    fig.tight_layout()
     fig.subplots_adjust(top=0.88)
-    plt.savefig("graphs/" + title.replace(' ', '_') + '.png')
+    plt.savefig("graphs/" + title.replace(' ', '_') + '.png', dpi=fig.dpi)
     plt.show()
 
