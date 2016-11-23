@@ -25,19 +25,30 @@ figure_rows_cols = {
         9: (3, 3)}
 
 def save_model(model):
-    pickle.dump(model, open('data/yaw_classifier.pickle','wb'))
+    pickle.dump(model, open('data/yaw_predictor_model.pickle','wb'))
 
-def predict(classifier, datetime, yaw, polar):
-    sky_model = SkyModelGenerator(sun_position(datetime), yaw=yaw).generate(observed_polar=viewers.uniform_viewer())
-    s = sky_generator.to_series(datetime, sky_model) 
-    assert not ('time' in s.index) and not ('yaw' in s.index) # only sin, cos and deg, should not include time and yaw
-    s = s.values.reshape(1,-1)
-    sin, cos = classifier.predict(s)[0]
-    angle = np.arctan2(sin, cos)
+def load_pickled_model():
+    return pickle.load(open('data/yaw_predictor_model.pickle','rb'))
+
+def angle_from_classifier_prediction(classifier_prediction, polar, decompose_yaw):
+    if decompose_yaw:
+        sin, cos = classifier_prediction
+        angle = np.arctan2(sin, cos)
+    else:
+        angle = classifier_prediction
+    
     if not polar:
         angle = angle % (2*np.pi)  # arctan2 returns in the range [-np.pi : np.pi] so we transform it to [0: 2*np.pi]
 
     return angle
+
+def predict(classifier, datetime, yaw, polar, decompose_yaw):
+    sky_model = SkyModelGenerator(sun_position(datetime), yaw=yaw).generate(observed_polar=viewers.uniform_viewer())
+    s = sky_generator.to_series(datetime, sky_model) 
+    assert not ('time' in s.index) and not ('yaw' in s.index) # only sin, cos and deg, should not include time and yaw
+    s = s.values.reshape(1,-1)
+    
+    return angle_from_classifier_prediction(classifier.predict(s)[0], polar, decompose_yaw)
 
 def parse_X(data):
     exog = data.loc[:, data.columns[:-1]] # without yaw
@@ -46,9 +57,12 @@ def parse_X(data):
     exog = exog.values # X
     return exog
 
-def parse_y(data):
-    yaws = data['yaw'].values
-    return np.array([*map(sky_generator.angle_to_scalar, yaws)])
+def parse_y(data, decompose_yaw):
+    yaws = data['yaw']
+    if decompose_yaw:
+        return np.array([*map(sky_generator.angle_to_scalar, yaws.values)])
+    else:
+        return yaws
 
 def rad_to_int(radians):
     return np.vectorize(int)(np.round(np.rad2deg(radians)))
@@ -67,7 +81,7 @@ def plot_expected_vs_actual(title, expected_yaws, actual_yaws, ax, polar):
     ax.set_title(title)
 
 def class_to_name(object):
-    return str(object).split('.')[-1].split('\'')[0].split('(')[0]
+    return str(object).split('(')[0]
 
 if __name__ == "__main__":
     today = datetime.datetime.utcnow().date()
@@ -80,8 +94,8 @@ if __name__ == "__main__":
     parser.add_argument('--yaw-step', type=int, default=10,
                                 help='rotational step in degrees')
     parser.add_argument('--polar', action="store_true", help='produce polar plot')
-
-
+    parser.add_argument('--load-model', action="store_true", help='load the model instead of training it')
+    parser.add_argument('--decompose-yaw', action="store_true", help='split yaw into cos(yaw) sin(yaw) to capture cyclicity')
 
     args = parser.parse_args()
 
@@ -91,12 +105,19 @@ if __name__ == "__main__":
     hours = args.hours
     yaw_step_degrees = args.yaw_step
     polar = args.polar
+    load_model = args.load_model
+    decompose_yaw = args.decompose_yaw
 
     data = pd.read_csv(training_file, index_col=0, parse_dates=True)
 
-    reg = linear_model.LinearRegression()
+    if load_model:
+        reg = load_pickled_model()
+    else:
+        reg = linear_model.ARDRegression(verbose=True)
+        reg.fit(parse_X(data), parse_y(data, decompose_yaw))
+        save_model(reg)
 
-    reg.fit(parse_X(data), parse_y(data))
+    print(reg)
 
     expected_yaws = np.deg2rad(range(0, 360, yaw_step_degrees))
 
@@ -115,14 +136,12 @@ if __name__ == "__main__":
             actual_yaws = []
             time = date_midnight + datetime.timedelta(hours=hour)
             for expected_yaw in expected_yaws:
-                actual_yaws.append(predict(reg, time, expected_yaw, polar))
+                actual_yaws.append(predict(reg, time, expected_yaw, polar, decompose_yaw))
             assert len(expected_yaws) == len(actual_yaws)
             plot_number = day*len(hours) + number
             plot_expected_vs_actual(str(time), expected_yaws, np.array(actual_yaws), flat_axes[plot_number], polar)
 
-    title = "%s on %s from %s for %d days" % (class_to_name(reg), training_file.split('/')[-1].split('.')[0], date, days)
-    if polar:
-        title = title + " polar"
+    title = "%s on %s from %s for %d days %s %s yaw" % (class_to_name(reg), training_file.split('/')[-1].split('.')[0], date, days, "polar" if polar else "", "sin cos" if decompose_yaw else "radians")
 
     fig.suptitle(title, size=16)
 
