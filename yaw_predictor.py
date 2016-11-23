@@ -19,7 +19,10 @@ figure_rows_cols = {
         3: (3, 1),
         4: (2, 2),
         5: (3, 2),
-        6: (3, 2)}
+        6: (3, 2),
+        7: (3, 3),
+        8: (3, 3),
+        9: (3, 3)}
 
 def save_model(model):
     pickle.dump(model, open('data/yaw_classifier.pickle','wb'))
@@ -71,6 +74,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Do a linear regression on a sample of the sky over N days to predict the time of day.')
     parser.add_argument('--training', help="training dataset csv file path")
     parser.add_argument('--date', help="start date for training data generation")
+    parser.add_argument('--days', type=int, default=1, help="number of days to run for (1 is default, means just the date)")
     parser.add_argument('--hours', type=int, action='append',
                                 help='sample the sky at this hour each day (can be specified multiple times)')
     parser.add_argument('--yaw-step', type=int, default=10,
@@ -83,6 +87,7 @@ if __name__ == "__main__":
 
     training_file = args.training
     date = datetime.datetime.strptime(args.date, '%y%m%d').date()
+    days = args.days
     hours = args.hours
     yaw_step_degrees = args.yaw_step
     polar = args.polar
@@ -95,23 +100,27 @@ if __name__ == "__main__":
 
     expected_yaws = np.deg2rad(range(0, 360, yaw_step_degrees))
 
-    date_midnight = datetime.datetime.combine(date, datetime.time(0,0))
-    rows, cols = figure_rows_cols[len(hours)]
+    plots = len(hours) * days
+    rows, cols = figure_rows_cols[plots]
+
     if polar:
         fig, axes = plt.subplots(subplot_kw=dict(polar=True, axisbg='none'), nrows=rows, ncols=cols)
     else:
         fig, axes = plt.subplots(nrows=rows, ncols=cols)
 
     flat_axes = np.array(axes).flatten()
-    for number, hour in enumerate(hours):
-        actual_yaws = []
-        time = date_midnight + datetime.timedelta(hours=hour)
-        for expected_yaw in expected_yaws:
-            actual_yaws.append(predict(reg, time, expected_yaw, polar))
-        assert len(expected_yaws) == len(actual_yaws)
-        plot_expected_vs_actual(str(time), expected_yaws, np.array(actual_yaws), flat_axes[number], polar)
+    for day in range(days):
+        date_midnight = datetime.datetime.combine(date + datetime.timedelta(days=day), datetime.time(0,0))
+        for number, hour in enumerate(hours):
+            actual_yaws = []
+            time = date_midnight + datetime.timedelta(hours=hour)
+            for expected_yaw in expected_yaws:
+                actual_yaws.append(predict(reg, time, expected_yaw, polar))
+            assert len(expected_yaws) == len(actual_yaws)
+            plot_number = day*len(hours) + number
+            plot_expected_vs_actual(str(time), expected_yaws, np.array(actual_yaws), flat_axes[plot_number], polar)
 
-    title = class_to_name(reg) + " on " + training_file.split('/')[-1].split('.')[0]
+    title = "%s on %s from %s for %d days" % (class_to_name(reg), training_file.split('/')[-1].split('.')[0], date, days)
     if polar:
         title = title + " polar"
 
