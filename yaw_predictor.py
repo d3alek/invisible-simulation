@@ -110,12 +110,9 @@ if __name__ == "__main__":
 
     data = pd.read_csv(training_file, index_col=0, parse_dates=True)
 
-    if load_model:
-        reg = load_pickled_model()
-    else:
-        reg = linear_model.ARDRegression(verbose=True)
-        reg.fit(parse_X(data), parse_y(data, decompose_yaw))
-        save_model(reg)
+    reg = linear_model.MultiTaskLasso(alpha=1000)
+    reg.fit(parse_X(data), parse_y(data, decompose_yaw))
+    save_model(reg)
 
     print(reg)
 
