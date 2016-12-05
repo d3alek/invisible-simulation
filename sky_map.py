@@ -115,6 +115,14 @@ def draw_angles(sky_model_generator):
         degree = sky_model.degrees[index]
         draw_angle_arrow(angle, (altitude, azimuth), sky_model.yaw, int(1+5*degree))
 
+def draw_intensity(sky_model_generator):
+    sky_model = sky_model_generator.generate(observed_polar=viewers.uniform_viewer())#viewers.vertical_strip_viewer())
+    intensities = sky_model.intensities
+    white = np.array([[255,255,255]]*len(intensities)) # TODO do it black white
+    colors = , normalize(intensities))
+    for (altitude, azimuth), color in zip(sky_model.observed_polar, colors):
+        pygame.draw.circle(windowSurfaceObj, 255*color, cartesian2d((altitude, azimuth)), 10, 0)
+
 if len(sys.argv) > 1:
     when = datetime.datetime.strptime(sys.argv[1], "%y%m%d")
 else:
@@ -137,12 +145,12 @@ def print_angle_and_degree_at(sky_map_coordinates, yaw):
     print("Observed: %s Angle: %f Degree %f" % ([*map(np.rad2deg, sky_model_local_observed)], np.rad2deg(sky_model_generator.get_angle(sky_model_local_observed)), sky_model_generator.get_degree(sky_model_local_observed)))
 
 def normalize(array):
-    return (array * (255/array.max())).astype(int)
+    return ((-array.min() + array) * (255/(-array.min() + array.max()))).astype(int)
 
 def draw_predictors(polar_ranks, rank_at_most):
     normalized = normalize(polar_ranks[:,1].astype(int))
     m = normalized.max()
-    normalized[normalized > rank_at_most] = m
+    normalized[polar_ranks[:,1] > rank_at_most] = m
     colors = plt.cm.cubehelix(normalized)
     for polar, parameter, color in zip(polar_ranks[:,0], polar_ranks[:,1], colors):
         pygame.draw.circle(windowSurfaceObj, 255*(1-color), cartesian2d(polar), 10, 0)
@@ -176,6 +184,7 @@ if __name__ == "__main__":
     yaw = 0
 
     rank_at_most = 1000
+    show_intensity = False
 
     show_predictors_key = "degree"
     features_rank = []
@@ -242,6 +251,9 @@ if __name__ == "__main__":
                 if event.key == K_4:
                     rank_at_most = 1000
 
+                if event.key == K_i:
+                    show_intensity = not show_intensity
+
                 if event.key == K_LEFT:
                     yaw += 10
                     print("Yaw: %d" % yaw)
@@ -250,13 +262,19 @@ if __name__ == "__main__":
                     print("Yaw: %d" % yaw)
 
         sky_model_generator = SkyModelGenerator(sun_at, yaw=np.deg2rad(yaw))
-        draw_angles(sky_model_generator)
+
+        if show_intensity:
+            draw_intensity(sky_model_generator)
+
+        else:
+            draw_angles(sky_model_generator)
+
+            if show_predictors:
+                draw_predictors(features_rank[show_predictors_key], rank_at_most)
+                print_statusbar(" ".join([str(rank_at_most), features_rank_file, show_predictors_key]))
+
         draw_sun(sky_model_generator, sun_at)
         draw_looking_at(yaw)
-
-        if show_predictors:
-            draw_predictors(features_rank[show_predictors_key], rank_at_most)
-            print_statusbar(" ".join([str(rank_at_most), features_rank_file, show_predictors_key]))
 
         pygame.display.update()
         fpsClock.tick(10)

@@ -42,9 +42,10 @@ def angle_from_classifier_prediction(classifier_prediction, polar, decompose_yaw
 
     return angle
 
-def predict(classifier, datetime, yaw, polar, decompose_yaw):
+def predict(classifier, datetime, yaw, polar, decompose_yaw, mask):
     sky_model = SkyModelGenerator(sun_position(datetime), yaw=yaw).generate(observed_polar=viewers.uniform_viewer())
-    s = sky_generator.to_series(datetime, sky_model) 
+    s = sky_generator.to_series(datetime, sky_model)
+    s = s[s.index[mask]]
     assert not ('time' in s.index) and not ('yaw' in s.index) # only sin, cos and deg, should not include time and yaw
     s = s.values.reshape(1,-1)
     
@@ -96,6 +97,7 @@ if __name__ == "__main__":
     parser.add_argument('--polar', action="store_true", help='produce polar plot')
     parser.add_argument('--load-model', action="store_true", help='load the model instead of training it')
     parser.add_argument('--decompose-yaw', action="store_true", help='split yaw into cos(yaw) sin(yaw) to capture cyclicity')
+    parser.add_argument('--lowest-rank', type=int, default=0, help='use feature ranking (comes out of another script). 0 disables it (default), 1 means use only features ranked 1, etc.')
 
     args = parser.parse_args()
 
@@ -107,10 +109,23 @@ if __name__ == "__main__":
     polar = args.polar
     load_model = args.load_model
     decompose_yaw = args.decompose_yaw
+    lowest_rank = args.lowest_rank
 
     data = pd.read_csv(training_file, index_col=0, parse_dates=True)
 
-    reg = linear_model.MultiTaskLasso(alpha=1000)
+    if lowest_rank > 0:
+        features_sin_rank_file = 'data/rfe_sin.pickle'
+        features_cos_rank_file = 'data/rfe_cos.pickle'
+        ranking_sin = np.append(pickle.load(open(features_sin_rank_file, 'rb')).ranking_, [1,1]) # to preserve the last 2 columns, time and yaw
+        ranking_cos = np.append(pickle.load(open(features_cos_rank_file, 'rb')).ranking_, [1,1]) # to preserve the last 2 columns, time and yaw
+        mask = np.ma.mask_or(ranking_sin <= lowest_rank, ranking_cos <= lowest_rank)
+        data = data[np.arange(data.columns.size)[mask]]
+        print("Only using features ranked <= %d so %d features selected" % (lowest_rank, data.columns.size - 2))
+        mask = mask[:-2] # to remove the last 2 columns leaving only features in mask
+    else:
+        mask = np.full(data.columns.size - 2, True, dtype=bool) # to remove the last 2 columns, leaving only features in mask
+
+    reg = linear_model.Ridge(alpha=1000)
     reg.fit(parse_X(data), parse_y(data, decompose_yaw))
     save_model(reg)
 
@@ -133,12 +148,12 @@ if __name__ == "__main__":
             actual_yaws = []
             time = date_midnight + datetime.timedelta(hours=hour)
             for expected_yaw in expected_yaws:
-                actual_yaws.append(predict(reg, time, expected_yaw, polar, decompose_yaw))
+                actual_yaws.append(predict(reg, time, expected_yaw, polar, decompose_yaw, mask))
             assert len(expected_yaws) == len(actual_yaws)
             plot_number = day*len(hours) + number
             plot_expected_vs_actual(str(time), expected_yaws, np.array(actual_yaws), flat_axes[plot_number], polar)
 
-    title = "%s on %s from %s for %d days %s %s yaw" % (class_to_name(reg), training_file.split('/')[-1].split('.')[0], date, days, "polar" if polar else "", "sin cos" if decompose_yaw else "radians")
+    title = "%s on %s from %s for %d days %s %s yaw %s features" % (class_to_name(reg), training_file.split('/')[-1].split('.')[0], date, days, "polar" if polar else "", "sin cos" if decompose_yaw else "radians", data.columns.size - 2)
 
     fig.suptitle(title, size=16)
 

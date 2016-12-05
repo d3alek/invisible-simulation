@@ -4,6 +4,9 @@ import numpy as np
 # - altitude - elevation (0-90)
 # - azimuth - angle of the object around the horizon, from north increasing towards east
 
+# Table 1 from Perez et al, 4th data group, first row. Why? Just testing...
+clear_sky_parameters = (-1.4366, -0.1233, 1, 0.2809, 0.9938)
+
 class LocalPolar:
     def __init__(self, altitude, azimuth):
         self.altitude = altitude
@@ -82,16 +85,6 @@ class SkyModelGenerator:
         cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, local_polar])]
         return angle_between(cartesian_sun, cartesian_observed)
 
-    def get_theta_sun(self):
-        """ The solar zenith distance (90\deg - solar altitude) """
-        warn_if_looks_like_degrees(self.sun)
-        return np.pi/2 - self.sun[0]
-    
-    def get_theta(self, point_radians):
-        """ The observed zenith distance (90\deg - observed altitude) """
-        warn_if_looks_like_degrees(point_radians)
-        return np.pi/2 - point_radians[0]
-
     def get_degree(self, local_polar):
         warn_if_looks_like_degrees(local_polar)
         gamma = self.get_gamma(local_polar)
@@ -131,6 +124,15 @@ class SkyModelGenerator:
 
         return orthogonal
 
+    def get_relative_luminance(self, zenith_angle, gamma):
+        a, b, c, d, e = clear_sky_parameters
+        return (1 + a * np.exp(b / np.cos(zenith_angle))) * (1 + c * np.exp(d*gamma) + e * np.cos(gamma)**2)
+
+    def get_intensity(self, local_polar):
+        """ Perez et al 1993 """
+        # ratio between the luminance at the considered sky element and the luminance of an arbitrary reference sky element
+        return self.get_relative_luminance(local_polar.altitude, self.get_gamma(local_polar))
+
     def generate(self, observed_polar):
         """ 
         Returns a sky model which assumes that the observer looks at *self.yaw*.
@@ -144,6 +146,7 @@ class SkyModelGenerator:
         angle_vectors = []
         angles = []
         degrees = []
+        intensities = []
 
         for altitude, azimuth in observed_polar:
             angle_vectors.append(self.get_angle_vector(LocalPolar(altitude, azimuth)))
@@ -156,10 +159,12 @@ class SkyModelGenerator:
             degree = self.get_degree(LocalPolar(altitude, azimuth))
             assert degree >= 0 and degree <= self.max_degree, "Degree should be in [0,%s] but is %s" % (max_degree, degree)
             degrees.append(degree)
+            intensity = self.get_intensity(LocalPolar(altitude, azimuth))
+            intensities.append(intensity)
 
         cartesian = map(to_cartesian, map(LocalPolar.from_tuple, observed_polar))
         x, y, z = zip(*cartesian)
-        return SkyModel(observed_polar, x, y, z, np.array(angles), np.array(angle_vectors), np.array(degrees), self.yaw)
+        return SkyModel(observed_polar, x, y, z, np.array(angles), np.array(angle_vectors), np.array(degrees), np.array(intensities), self.yaw)
 
     def to_world(self, polar):
         if np.isscalar(polar):
@@ -174,7 +179,7 @@ class SkyModelGenerator:
             return rotate_yaw(polar, -self.yaw)
 
 class SkyModel:
-    def __init__(self, observed_polar, x, y, z, angles, angle_vectors, degrees, yaw):
+    def __init__(self, observed_polar, x, y, z, angles, angle_vectors, degrees, intensities, yaw):
         self.observed_polar = observed_polar
         self.x = x
         self.y = y
@@ -182,6 +187,7 @@ class SkyModel:
         self.angles = angles
         self.angle_vectors = angle_vectors
         self.degrees = degrees
+        self.intensities = intensities
         self.yaw = yaw
 
 def test_sunset_sunrise():
