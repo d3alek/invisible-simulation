@@ -3,6 +3,7 @@ from pysolar.util import get_sunrise_sunset
 import datetime
 import numpy as np
 import pytz
+from geometry import PolarPoint
 
 LATITUDE_SEVILLA_LONGITUDE_SEVILLA = (37.366123, -5.996422)
 
@@ -16,7 +17,7 @@ def sunrise_sunset(when):
 
 def pysolar_to_local(pysolar_position):
     altitude, azimuth = pysolar_position
-    return np.deg2rad(altitude), np.deg2rad((-azimuth + 180) % 360)
+    return PolarPoint(np.deg2rad(altitude), np.deg2rad((-azimuth + 180) % 360))
 
 def sun_position(datetime_utc):
     # The conversion from datetime_utc to raw_localized_datetime is necessary because

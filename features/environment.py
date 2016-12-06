@@ -1,3 +1,5 @@
+# USE: behave -D BEHAVE_DEBUG_ON_ERROR (to enable debug-on-error)
+
 BEHAVE_DEBUG_ON_ERROR = False
 
 def setup_debug_on_error(userdata):
@@ -15,3 +17,5 @@ def after_step(context, step):
     if BEHAVE_DEBUG_ON_ERROR and step.status == "failed":
         import ipdb
         ipdb.post_mortem(step.exc_traceback)
+
+

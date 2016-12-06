@@ -1,6 +1,7 @@
 from behave import *
 from sky_model import SkyModelGenerator
 import numpy as np
+from utils import convert_observed_and_sun_to_polar
 
 @given('{sun_or_look} at altitude {direction}')
 def step_impl(context, sun_or_look, direction):
@@ -28,7 +29,8 @@ def step_impl(context, direction):
 
 @then('gamma is {expected_gamma:d}')
 def step_impl(context, expected_gamma):
-    observed_radians = [*map(np.deg2rad, context.observed)]
-    gamma_degrees = np.floor(np.rad2deg(SkyModelGenerator(tuple(map(np.deg2rad, context.sun))).get_gamma(observed_radians)))
+
+    observed_radians, sun_radians = convert_observed_and_sun_to_polar(context)
+    gamma_degrees = np.floor(np.rad2deg(SkyModelGenerator(sun_radians).get_gamma(observed_radians)))
     assert np.isclose(gamma_degrees, expected_gamma), "Expected %d, actual %d" % (expected_gamma, gamma_degrees)
 

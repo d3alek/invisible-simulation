@@ -1,99 +1,31 @@
 import numpy as np
+from geometry import PolarPoint, unit_vector, angle_between, to_cartesian, rotate_yaw
 # using the horizontal celestrial coordinate system https://en.wikipedia.org/wiki/Horizontal_coordinate_system
 # this means we have two coordinates: 
 # - altitude - elevation (0-90)
 # - azimuth - angle of the object around the horizon, from north increasing towards east
 
-# Table 1 from Perez et al, 4th data group, first row. Why? Just testing...
-clear_sky_parameters = (-1.4366, -0.1233, 1, 0.2809, 0.9938)
-
-class LocalPolar:
-    def __init__(self, altitude, azimuth):
-        self.altitude = altitude
-        self.azimuth = azimuth
-
-    @classmethod
-    def from_tuple(cls, tuple):
-        obj = cls(tuple[0], tuple[1])
-        return obj
-
-    def __iter__(self):
-        return iter([self.altitude, self.azimuth])
-
-seven_degrees_in_radians = 7*np.pi/180
-DEFAULT_OBSERVED_ALTITUDES = np.arange(np.pi/2, step=seven_degrees_in_radians)
-DEFAULT_OBSERVED_AZIMUTHS = np.arange(2*np.pi, step=seven_degrees_in_radians)
-
-def unit_vector(vector):
-    """ Returns the unit vector of the vector.  """
-    return vector / np.linalg.norm(vector) 
-
-def angle_between(v1, v2):
-    """ Returns the angle in radians between vectors 'v1' and 'v2'::
-
-            >>> print(np.round(angle_between((1, 0, 0), (0, 1, 0)), 3))
-            1.571
-            >>> angle_between((1, 0, 0), (1, 0, 0))
-            0.0
-            >>> print(np.round(angle_between((1, 0, 0), (-1, 0, 0)), 3))
-            3.142
-    """
-    v1_u = unit_vector(v1)
-    v2_u = unit_vector(v2)
-    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
-
-def round_print(a):
-    to_print = np.round(a,1)
-    to_print[to_print==0.] = 0. # to remove -0.
-    return print(to_print)
-
-def to_cartesian(local_polar):
-    """ altitude goes (-90;90) in rest of the program so add 90\deg to it. 
-
-    >>> round_print(to_cartesian(LocalPolar(np.pi/2, 0)))
-    [ 0.  0.  1.]
-    >>> round_print(to_cartesian(LocalPolar(-np.pi/2, 0)))
-    [ 0.  0. -1.]
-    >>> round_print(to_cartesian(LocalPolar(0, np.pi/2)))
-    [ 0.  1.  0.]
-    >>> round_print(to_cartesian(LocalPolar(0, 0)))
-    [ 1.  0.  0.]
-    """
-    altitude = local_polar.altitude + np.pi/2
-    azimuth = local_polar.azimuth
-    return np.array((np.sin(altitude) * np.cos(azimuth), np.sin(altitude) * np.sin(azimuth), -np.cos(altitude)))
-
-def warn_if_looks_like_degrees(radians):
-    if max(radians) > 4*np.pi:
-       print("It is possible you are passing degrees to a function that expects radians. Radians passed: ", radians) 
-
-def rotate_yaw(polar, yaw_radians):
-    return LocalPolar(polar[0], polar[1] + yaw_radians)
-
 class SkyModelGenerator:
-    zenith = LocalPolar(np.pi/2, 0)
+    zenith = PolarPoint(np.pi/2, 0)
 
     def __init__(self, sun_radians, max_degree=0.8, yaw=0):
-        warn_if_looks_like_degrees(sun_radians)
         self.max_degree = max_degree
         self.yaw = yaw
-        self.sun = self.to_local(sun_radians)
+        self.sun = self.to_local(sun_radians) # where is the sun in our field of view
 
-    def get_gamma(self, local_polar):
+    def get_gamma(self, polar_point):
         """ Angular distance between the observed pointing and the sun. Scattering angle. """
-        warn_if_looks_like_degrees(local_polar)
-        cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, local_polar])]
+        cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, polar_point])]
         return angle_between(cartesian_sun, cartesian_observed)
 
-    def get_degree(self, local_polar):
-        warn_if_looks_like_degrees(local_polar)
-        gamma = self.get_gamma(local_polar)
+    def get_degree(self, polar_point):
+        gamma = self.get_gamma(polar_point)
         return self.max_degree * pow(np.sin(gamma), 2) / (1 + pow(np.cos(gamma), 2))
 
-    def is_left_of_the_sun_antisun_split(self, local_polar):
+    def is_left_of_the_sun_antisun_split(self, polar_point):
         sun_azimuth = self.sun.azimuth
         normalized_sun_azimuth = self.sun.azimuth % (2*np.pi)
-        observed_azimuth = local_polar.azimuth
+        observed_azimuth = polar_point.azimuth
         normalized_observed_azimuth = observed_azimuth % (2*np.pi)
         anti_sun_azimuth = (normalized_sun_azimuth + np.pi) % (2*np.pi)
 
@@ -102,36 +34,27 @@ class SkyModelGenerator:
         else:
             return (normalized_observed_azimuth > normalized_sun_azimuth and normalized_observed_azimuth < 2*np.pi) or normalized_observed_azimuth < anti_sun_azimuth
 
-    def get_angle(self, local_polar):
-        cartesian_sun, cartesian_zenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.zenith, local_polar])]
+    def get_angle(self, polar_point):
+        cartesian_sun, cartesian_zenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.zenith, polar_point])]
 
-        angle_vector = self.get_angle_vector(local_polar)
+        angle_vector = self.get_angle_vector(polar_point)
         vertical_plane_normal = np.cross(cartesian_zenith, cartesian_observed)
         angle = angle_between(vertical_plane_normal, angle_vector) % (np.pi)
          
         #TODO understand why this is necessary
-        if self.is_left_of_the_sun_antisun_split(local_polar):
+        if self.is_left_of_the_sun_antisun_split(polar_point):
             angle = np.pi-angle
 
         return angle
     
     # useful for 3d plotting
-    def get_angle_vector(self, local_polar):
-        cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, local_polar])]
+    def get_angle_vector(self, polar_point):
+        cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, polar_point])]
         orthogonal = np.cross(cartesian_sun, cartesian_observed)
         if np.isclose(np.linalg.norm(orthogonal), 0):
             return (1, 0, 0)
 
         return orthogonal
-
-    def get_relative_luminance(self, zenith_angle, gamma):
-        a, b, c, d, e = clear_sky_parameters
-        return (1 + a * np.exp(b / np.cos(zenith_angle))) * (1 + c * np.exp(d*gamma) + e * np.cos(gamma)**2)
-
-    def get_intensity(self, local_polar):
-        """ Perez et al 1993 """
-        # ratio between the luminance at the considered sky element and the luminance of an arbitrary reference sky element
-        return self.get_relative_luminance(local_polar.altitude, self.get_gamma(local_polar))
 
     def generate(self, observed_polar):
         """ 
@@ -149,20 +72,20 @@ class SkyModelGenerator:
         intensities = []
 
         for altitude, azimuth in observed_polar:
-            angle_vectors.append(self.get_angle_vector(LocalPolar(altitude, azimuth)))
+            angle_vectors.append(self.get_angle_vector(PolarPoint(altitude, azimuth)))
 
             # necessary to subtract azimuth because each point's angle is calculated 
             # as if observer is looking towards that point we assume that observer is looking at 0
-            angle = (self.get_angle(LocalPolar(altitude, azimuth)) - azimuth) % np.pi
+            angle = (self.get_angle(PolarPoint(altitude, azimuth)) - azimuth) % np.pi
             assert angle >= 0 and angle <= np.pi, "Angle should be in [0,pi] but is %s" % angle
             angles.append(angle)
-            degree = self.get_degree(LocalPolar(altitude, azimuth))
+            degree = self.get_degree(PolarPoint(altitude, azimuth))
             assert degree >= 0 and degree <= self.max_degree, "Degree should be in [0,%s] but is %s" % (max_degree, degree)
             degrees.append(degree)
-            intensity = self.get_intensity(LocalPolar(altitude, azimuth))
+            intensity = self.get_intensity(PolarPoint(altitude, azimuth))
             intensities.append(intensity)
 
-        cartesian = map(to_cartesian, map(LocalPolar.from_tuple, observed_polar))
+        cartesian = map(to_cartesian, map(PolarPoint.from_tuple, observed_polar))
         x, y, z = zip(*cartesian)
         return SkyModel(observed_polar, x, y, z, np.array(angles), np.array(angle_vectors), np.array(degrees), np.array(intensities), self.yaw)
 
@@ -177,6 +100,18 @@ class SkyModelGenerator:
             return polar - self.yaw
         else:
             return rotate_yaw(polar, -self.yaw)
+
+    # Table 1 from Perez et al, 4th data group, first row. Why? Just testing...
+    clear_sky_parameters = (-1.4366, -0.1233, 1, 0.2809, 0.9938)
+
+    def get_relative_luminance(self, zenith_angle, gamma):
+        a, b, c, d, e = self.clear_sky_parameters
+        return (1 + a * np.exp(b / np.cos(zenith_angle))) * (1 + c * np.exp(d*gamma) + e * np.cos(gamma)**2)
+
+    def get_intensity(self, polar_point):
+        """ Perez et al 1993 """
+        # ratio between the luminance at the considered sky element and the luminance of an arbitrary reference sky element
+        return self.get_relative_luminance(polar_point.altitude, self.get_gamma(polar_point))
 
 class SkyModel:
     def __init__(self, observed_polar, x, y, z, angles, angle_vectors, degrees, intensities, yaw):
@@ -211,7 +146,4 @@ def test_sunset_sunrise():
     return False
 
 if __name__ == "__main__":
-    import doctest
-    doctest.testmod()
-
     assert test_sunset_sunrise() == True, "Sunset did not look like sunrise as we rotated 360 degrees on the spot"
