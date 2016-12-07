@@ -6,21 +6,23 @@ Observer is facing north and looking up straight at the zenith. This means that:
 """
 
 import pygame, sys
-from features.sky_model import SkyModelGenerator, LocalPolar
+from sky_model import SkyModelGenerator
+from geometry import PolarPoint
 import numpy as np
 from pygame.locals import *
 import ipdb
 
 import datetime
-from features.sun_calculator import sunrise_sunset, sun_position
+from sun_calculator import sunrise_sunset, sun_position
 
-import features.viewers as viewers
+import viewers
 
 import matplotlib.pyplot as plt
 
 pygame.init()
 fpsClock = pygame.time.Clock()
 
+FONT_TTF = 'freesansbold.ttf'
 EAST = (0, np.pi/2)
 
 RADIUS = 400
@@ -97,30 +99,37 @@ def draw_angle_arrow(angle_rad, radians, yaw_radians, width=1, with_text=False):
     windowSurfaceObj.blit(arrow, rect)
 
     if with_text:
-        fontObj = pygame.font.Font('freesansbold.ttf', 13)
+        fontObj = pygame.font.Font(FONT_TTF, 13)
         text = str(np.int16(np.round(np.rad2deg(angle_rad), 0)))
         renderedFont = fontObj.render(text, False, redColor)
         rect = renderedFont.get_rect(center=pos+5)
         windowSurfaceObj.blit(renderedFont, rect)
 
-def draw_looking_at(yaw_degrees):
+def draw_north(yaw_degrees):
     arrow = draw_arrow(redColor, 3, 90+yaw_degrees)
-    rect = arrow.get_rect(center=CENTER)
+    position = np.array([WIDTH - 100, 100])
+    rect = arrow.get_rect(center=position)
     windowSurfaceObj.blit(arrow, rect)
+    font = pygame.font.Font(FONT_TTF, 13)
+    rendered_font = font.render("N", False, redColor)
+    rotated_rendered_font = pygame.transform.rotate(rendered_font, yaw_degrees)
+    font_position = np.array([np.sin(np.deg2rad(yaw_degrees))*20,np.cos(np.deg2rad(yaw_degrees))*20])
+    rect = rotated_rendered_font.get_rect(center=position - font_position)
+    windowSurfaceObj.blit(rotated_rendered_font, rect)
 
 def draw_angles(sky_model_generator):
-    sky_model = sky_model_generator.generate(observed_polar=viewers.uniform_viewer())#viewers.vertical_strip_viewer())
-    for index, (altitude, azimuth) in enumerate(sky_model.observed_polar):
+    sky_model = sky_model_generator.generate(viewer=viewers.uniform_viewer())#viewers.vertical_strip_viewer())
+    for index, (altitude, azimuth) in enumerate(sky_model.observed_points):
         angle = sky_model.angles[index]
         degree = sky_model.degrees[index]
         draw_angle_arrow(angle, (altitude, azimuth), sky_model.yaw, int(1+5*degree))
 
 def draw_intensity(sky_model_generator):
-    sky_model = sky_model_generator.generate(observed_polar=viewers.uniform_viewer())#viewers.vertical_strip_viewer())
+    sky_model = sky_model_generator.generate(viewer=viewers.uniform_viewer())#viewers.vertical_strip_viewer())
     intensities = sky_model.intensities
     white = np.array([[255,255,255]]*len(intensities)) # TODO do it black white
-    colors = , normalize(intensities))
-    for (altitude, azimuth), color in zip(sky_model.observed_polar, colors):
+    #colors = , normalize(intensities))
+    for (altitude, azimuth), color in zip(sky_model.observed_points, colors):
         pygame.draw.circle(windowSurfaceObj, 255*color, cartesian2d((altitude, azimuth)), 10, 0)
 
 if len(sys.argv) > 1:
@@ -141,7 +150,7 @@ mouse_down = False
 def print_angle_and_degree_at(sky_map_coordinates, yaw):
     observed = polar(sky_map_coordinates)
     sky_model_generator = SkyModelGenerator(sun_at, yaw=yaw)
-    sky_model_local_observed = LocalPolar.from_tuple(observed)
+    sky_model_local_observed = PolarPoint.from_tuple(observed)
     print("Observed: %s Angle: %f Degree %f" % ([*map(np.rad2deg, sky_model_local_observed)], np.rad2deg(sky_model_generator.get_angle(sky_model_local_observed)), sky_model_generator.get_degree(sky_model_local_observed)))
 
 def normalize(array):
@@ -169,7 +178,7 @@ def add_polar_coordinates(ranks):
             "angle-cos": np.array([*zip(polar_coordinates, angle_cos_ranks)])}
 
 def print_statusbar(string):
-    fontObj = pygame.font.Font('freesansbold.ttf', 20)
+    fontObj = pygame.font.Font(FONT_TTF, 20)
     renderedFont = fontObj.render(string, False, whiteColor)
     rect = renderedFont.get_rect(center=(WIDTH/2, HEIGHT-10))
     windowSurfaceObj.blit(renderedFont, rect)
@@ -256,10 +265,8 @@ if __name__ == "__main__":
 
                 if event.key == K_LEFT:
                     yaw += 10
-                    print("Yaw: %d" % yaw)
                 if event.key == K_RIGHT:
                     yaw -= 10
-                    print("Yaw: %d" % yaw)
 
         sky_model_generator = SkyModelGenerator(sun_at, yaw=np.deg2rad(yaw))
 
@@ -274,7 +281,7 @@ if __name__ == "__main__":
                 print_statusbar(" ".join([str(rank_at_most), features_rank_file, show_predictors_key]))
 
         draw_sun(sky_model_generator, sun_at)
-        draw_looking_at(yaw)
+        draw_north(yaw)
 
         pygame.display.update()
         fpsClock.tick(10)

@@ -1,22 +1,41 @@
+"""
+The sky model is using the horizontal celestrial coordinate system https://en.wikipedia.org/wiki/Horizontal_coordinate_system 
+this means we have two coordinates: 
+ - altitude - elevation (0-pi/2)
+ - azimuth - angle of the object around the horizon, from north increasing towards east
+ - both in polar (radians)
+"""
+
 import numpy as np
 from geometry import PolarPoint, unit_vector, angle_between, to_cartesian, rotate_yaw
-# using the horizontal celestrial coordinate system https://en.wikipedia.org/wiki/Horizontal_coordinate_system
-# this means we have two coordinates: 
-# - altitude - elevation (0-90)
-# - azimuth - angle of the object around the horizon, from north increasing towards east
 
 class SkyModelGenerator:
     zenith = PolarPoint(np.pi/2, 0)
 
-    def __init__(self, sun_radians, max_degree=0.8, yaw=0):
+    def __init__(self, sun_position, yaw=0, max_degree=0.8):
+        """ Contains the logic for calculating angle of polarization, degree of polarization 
+            and intensity based on the position of the sun in the sky.
+
+        Arguments: 
+            sun_position - geometry.PolarPoint that describes the position of the sun in the sky
+            yaw - angle in radians that describes the offset between the facing direction and true north (clockwise)
+            max_degree - the maximum degree of polarization, in theory 1 but in nature observed no more than 0.8 (default)
+
+        Use:
+            As it is a generator, intended use is to call the generate method passing an instance of Viewer
+        """
         self.max_degree = max_degree
         self.yaw = yaw
-        self.sun = self.to_local(sun_radians) # where is the sun in our field of view
+        self.sun = self.to_local(sun_position) # where is the sun in our field of view
 
     def get_gamma(self, polar_point):
         """ Angular distance between the observed pointing and the sun. Scattering angle. """
         cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, polar_point])]
         return angle_between(cartesian_sun, cartesian_observed)
+
+    def get_theta(self, polar_point):
+        """ Only used in reproduce_wiki_graphs """
+        return np.pi/2 - polar_point.altitude
 
     def get_degree(self, polar_point):
         gamma = self.get_gamma(polar_point)
@@ -56,7 +75,7 @@ class SkyModelGenerator:
 
         return orthogonal
 
-    def generate(self, observed_polar):
+    def generate(self, viewer):
         """ 
         Returns a sky model which assumes that the observer looks at *self.yaw*.
         The angles at the observed points are calibrated with this in mind. 
@@ -71,7 +90,9 @@ class SkyModelGenerator:
         degrees = []
         intensities = []
 
-        for altitude, azimuth in observed_polar:
+        observed_points = viewer.get_observed_points()
+        for observed_point in observed_points:
+            altitude, azimuth = observed_point.altitude, observed_point.azimuth
             angle_vectors.append(self.get_angle_vector(PolarPoint(altitude, azimuth)))
 
             # necessary to subtract azimuth because each point's angle is calculated 
@@ -85,9 +106,9 @@ class SkyModelGenerator:
             intensity = self.get_intensity(PolarPoint(altitude, azimuth))
             intensities.append(intensity)
 
-        cartesian = map(to_cartesian, map(PolarPoint.from_tuple, observed_polar))
-        x, y, z = zip(*cartesian)
-        return SkyModel(observed_polar, x, y, z, np.array(angles), np.array(angle_vectors), np.array(degrees), np.array(intensities), self.yaw)
+        cartesian = [*map(to_cartesian, observed_points)]
+        x, y, z = [*map(np.array, zip(*cartesian))]
+        return SkyModel(observed_points, x, y, z, np.array(angles), np.array(angle_vectors), np.array(degrees), np.array(intensities), self.yaw)
 
     def to_world(self, polar):
         if np.isscalar(polar):
@@ -114,11 +135,9 @@ class SkyModelGenerator:
         return self.get_relative_luminance(polar_point.altitude, self.get_gamma(polar_point))
 
 class SkyModel:
-    def __init__(self, observed_polar, x, y, z, angles, angle_vectors, degrees, intensities, yaw):
-        self.observed_polar = observed_polar
-        self.x = x
-        self.y = y
-        self.z = z
+    def __init__(self, observed_points, x, y, z, angles, angle_vectors, degrees, intensities, yaw):
+        self.observed_points = observed_points
+        self.x, self.y, self.z = x, y, z
         self.angles = angles
         self.angle_vectors = angle_vectors
         self.degrees = degrees

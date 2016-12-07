@@ -5,13 +5,13 @@ import pandas as pd
 import numpy as np
 from sklearn import linear_model
 from sklearn import feature_selection
-from features.sky_model import SkyModelGenerator
-from features.sun_calculator import sun_position
+from sky_model import SkyModelGenerator
+from sun_calculator import sun_position
 import sky_generator
 import datetime
 import argparse
 import pickle 
-import features.viewers as viewers
+import viewers as viewers
 
 def parse_X(data):
     exog = data.loc[:, data.columns[:-1]] # without yaw

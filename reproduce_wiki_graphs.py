@@ -6,6 +6,8 @@ import matplotlib as mpl
 from matplotlib import cm
 import matplotlib.pyplot as plt
 import ipdb
+from geometry import PolarPoint
+import viewers
 
 # Reproduces graph https://en.wikipedia.org/wiki/Rayleigh_sky_model#/media/File:Soldis_zendis.jpg
 
@@ -24,10 +26,10 @@ def matrix_from_func(func):
 
     return np.array(rows)
 
-gamma_func = lambda alt, azim: np.rad2deg(SkyModelGenerator(sun).get_gamma((alt, azim)))
+gamma_func = lambda alt, azim: np.rad2deg(SkyModelGenerator(PolarPoint.from_tuple(sun)).get_gamma(PolarPoint(alt, azim)))
 gamma_image = matrix_from_func(gamma_func)
 
-theta_func = lambda alt, azim: np.rad2deg(SkyModelGenerator(sun).get_theta((alt, azim)))
+theta_func = lambda alt, azim: np.rad2deg(SkyModelGenerator(PolarPoint.from_tuple(sun)).get_theta(PolarPoint(alt, azim)))
 theta_image = matrix_from_func(theta_func)
 
 images = [gamma_image, theta_image]
@@ -43,7 +45,7 @@ fig.colorbar(im, cax=cbar_ax)
 
 plt.figure()
 
-horizon_degrees = [SkyModelGenerator(sun, max_degree=1).get_degree((0, azim)) for azim in observed_azimuths]
+horizon_degrees = [SkyModelGenerator(PolarPoint.from_tuple(sun), max_degree=1).get_degree(PolarPoint(0, azim)) for azim in observed_azimuths]
 plt.plot(horizon_degrees);
 plt.xlabel('Azimuth');
 plt.ylabel('% Polarization on Horizon')
@@ -55,11 +57,11 @@ for sun in [EAST, (np.pi/2 - 0.8, np.pi), WEST]:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    sm = SkyModelGenerator(sun).generate()
+    sm = SkyModelGenerator(PolarPoint.from_tuple(sun)).generate(viewer=viewers.uniform_viewer())
 
-    u, v, w = np.empty(sm.angle_vectors.shape), np.empty(sm.angle_vectors.shape), np.empty(sm.angle_vectors.shape)
+    u, v, w = np.empty(len(sm.angle_vectors)), np.empty(len(sm.angle_vectors)), np.empty(len(sm.angle_vectors))
 
-    for index, angle_vector in enumerate(sm.angle_vectors.flat):
+    for index, angle_vector in enumerate(sm.angle_vectors):
             u.flat[index], v.flat[index], w.flat[index] = angle_vector
 
     ax.quiver(sm.x, sm.y, sm.z, u, v, w, length=0.1)
@@ -68,7 +70,7 @@ for sun in [EAST, (np.pi/2 - 0.8, np.pi), WEST]:
     ax.set_ylabel('y')
     ax.set_zlabel('z')
 
-    sun_x, sun_y, sun_z = sky_model.to_cartesian(sun)
+    sun_x, sun_y, sun_z = sky_model.to_cartesian(PolarPoint.from_tuple(sun))
 
     ax.scatter([sun_x],[sun_y],[sun_z],color="y",s=1000)
 

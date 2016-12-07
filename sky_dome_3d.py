@@ -5,8 +5,8 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib as mpl
 from matplotlib import cm
 import matplotlib.pyplot as plt
-import ipdb
-
+from geometry import PolarPoint
+import viewers
 
 EAST = (0, np.pi/2)
 WEST = (0, 3*np.pi/2)
@@ -20,14 +20,17 @@ for sun in [EAST, (np.pi/2 - 0.8, np.pi), WEST]:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    sm = SkyModelGenerator(sun).generate()
+    sm = SkyModelGenerator(PolarPoint.from_tuple(sun)).generate(viewers.uniform_viewer())
 
-    u, v, w = np.empty(sm.angle_vectors.shape), np.empty(sm.angle_vectors.shape), np.empty(sm.angle_vectors.shape)
-    linewidths = np.empty(sm.angle_vectors.size)
+    u, v, w = np.empty(len(sm.angle_vectors)), np.empty(len(sm.angle_vectors)), np.empty(len(sm.angle_vectors))
+    linewidths = np.empty(len(sm.angle_vectors))
 
-    for index, angle_vector in enumerate(sm.angle_vectors.flat):
-            u.flat[index], v.flat[index], w.flat[index] = angle_vector
-            linewidths[index] = 1 + 3*sm.degrees.flat[index]
+    for index, angle_vector in enumerate(sm.angle_vectors):
+        u[index], v[index], w[index] = angle_vector
+        linewidths[index] = 1 + 3*sm.degrees.flat[index]
+
+    import ipdb
+    ipdb.set_trace()
 
     ax.quiver(sm.x, sm.y, sm.z, u, v, w, length=0.1, linewidths=linewidths, arrow_length_ratio = 0)
 
@@ -35,7 +38,7 @@ for sun in [EAST, (np.pi/2 - 0.8, np.pi), WEST]:
     ax.set_ylabel('west-east')
     ax.set_zlabel('altitude')
 
-    sun_x, sun_y, sun_z = sky_model.to_cartesian(sun)
+    sun_x, sun_y, sun_z = sky_model.to_cartesian(PolarPoint.from_tuple(sun))
 
     ax.scatter([sun_x],[sun_y],[sun_z],color="y",s=1000)
 

@@ -1,8 +1,17 @@
 import numpy as np
+from geometry import PolarPoint
+
+class Viewer:
+    def __init__(self, observed_points):
+        assert isinstance(observed_points[0], PolarPoint), "Constructor expects a list of PolarPoint-s"
+        self.observed_points = observed_points
+    
+    def get_observed_points(self):
+        return self.observed_points
 
 ten_degrees_in_radians = np.pi/18
 
-def vertical_strip_viewer():
+def horizontal_strip_viewer():
     observed_azimuths = np.arange(2*np.pi, step=ten_degrees_in_radians)
     def absolute_cosine(azimuths):
         """ 
@@ -16,8 +25,8 @@ def vertical_strip_viewer():
                 points.append((altitude, azimuth))
         
         return np.array(points)
-
-    return absolute_cosine(observed_azimuths)
+    observed_points = absolute_cosine(observed_azimuths)
+    return Viewer([*map(PolarPoint.from_tuple, observed_points)])
 
 def uniform_viewer():
     observed_azimuths = np.arange(2*np.pi, step=ten_degrees_in_radians)
@@ -25,5 +34,6 @@ def uniform_viewer():
 
     azimuths, altitudes = np.meshgrid(observed_azimuths, observed_altitudes)
 
-    return [*zip(altitudes.flatten(), azimuths.flatten())]
+    observed_points = [*zip(altitudes.flatten(), azimuths.flatten())]
+    return Viewer([*map(PolarPoint.from_tuple, observed_points)])
 

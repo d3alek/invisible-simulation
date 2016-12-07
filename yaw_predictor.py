@@ -4,13 +4,13 @@
 import pandas as pd
 import numpy as np
 from sklearn import linear_model
-from features.sky_model import SkyModelGenerator
-from features.sun_calculator import sun_position
+from sky_model import SkyModelGenerator
+from sun_calculator import sun_position
 import datetime
 import sky_generator
 import argparse
 import pickle 
-import features.viewers as viewers
+import viewers as viewers
 from matplotlib import pyplot as plt
 
 figure_rows_cols = {
