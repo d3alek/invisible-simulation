@@ -29,9 +29,6 @@ for sun in [EAST, (np.pi/2 - 0.8, np.pi), WEST]:
         u[index], v[index], w[index] = angle_vector
         linewidths[index] = 1 + 3*sm.degrees.flat[index]
 
-    import ipdb
-    ipdb.set_trace()
-
     ax.quiver(sm.x, sm.y, sm.z, u, v, w, length=0.1, linewidths=linewidths, arrow_length_ratio = 0)
 
     ax.set_xlabel('south-north');

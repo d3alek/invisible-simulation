@@ -1,13 +1,16 @@
-This readme serves as a specification of the desired behavior of the scripts in this repository. 
-
-What you will notice is I like the question asking approach instead of exploding and redirecting to help if a required parameter is missing.
-This has the advantage that you don't forget about some optional parameters. If you want the optional parameters to be set to default, pass in --defaults.
-
-# Model automated verification
+# Automated verification of the model
 
 ```
-$ python features/sky_model.py
+$ python features/sky_model.py 
+... no output here means all fine ...
 $ behave
+... you expect no failed tests ...
+$ python sky_dome_3d.py
+... three pyplot skydome plots with the angle of polarization shown as lines
+and the degree of polarization shown as the width of the lines ...
+$ python reproduce_wiki_graphs.py
+... reproduces 2 graphs from https://en.wikipedia.org/wiki/Rayleigh_sky_model to verify visually that the model is correct ...
+
 ```
 
 # Data generation
