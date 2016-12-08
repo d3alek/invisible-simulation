@@ -3,12 +3,12 @@
 
 import pandas as pd
 import numpy as np
-from features.sky_model import SkyModelGenerator
-from features.sun_calculator import sunrise_sunset, sun_position
+from sky_model import SkyModelGenerator
 import datetime
 import random
 import argparse
-import features.viewers as viewers
+import viewers
+import places
 
 DATA_FILE_NAME = 'data/latest_yaw_predictor_data.csv'
 
@@ -17,7 +17,8 @@ def angle_to_scalar(angle):
     return np.array([np.sin(angle), np.cos(angle)])
 
 def to_series(name, sky_model):
-    azimuths, altitudes = [*map(np.array, zip(*sky_model.observed_polar))]
+    azimuths = np.array([*map(lambda a: a.azimuth, sky_model.observed_points)])
+    altitudes = np.array([*map(lambda a: a.altitude, sky_model.observed_points)])
     angles = np.array([*map(angle_to_scalar, sky_model.angles.flatten())])
     degrees = sky_model.degrees.flatten()
 
@@ -41,7 +42,7 @@ def generate_data(file_name, datetimes, yaw_step):
         print("Generating sky for yaw %s " % (np.rad2deg(yaw)), end="")
         for time in datetimes:
             print(".", end="", flush=True)
-            sky_model = SkyModelGenerator(sun_position(time), yaw=yaw).generate(observed_polar = viewers.uniform_viewer())
+            sky_model = SkyModelGenerator.for_time_and_place(time, places.sevilla, yaw).generate(viewers.uniform_viewer())
             name = ' '.join(map(str, [time, yaw]))
             s = to_series(name, sky_model)
             s = s.append(pd.Series([time], name=name, index=['time']))

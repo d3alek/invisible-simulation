@@ -5,13 +5,13 @@ import pandas as pd
 import numpy as np
 from sklearn import linear_model
 from sky_model import SkyModelGenerator
-from sun_calculator import sun_position
 import datetime
 import sky_generator
 import argparse
 import pickle 
 import viewers as viewers
 from matplotlib import pyplot as plt
+import places
 
 figure_rows_cols = {
         1: (1, 1), 
@@ -43,7 +43,7 @@ def angle_from_classifier_prediction(classifier_prediction, polar, decompose_yaw
     return angle
 
 def predict(classifier, datetime, yaw, polar, decompose_yaw, mask):
-    sky_model = SkyModelGenerator(sun_position(datetime), yaw=yaw).generate(observed_polar=viewers.uniform_viewer())
+    sky_model = SkyModelGenerator.for_time_and_place(datetime, places.sevilla, yaw).generate(viewers.uniform_viewer())
     s = sky_generator.to_series(datetime, sky_model)
     s = s[s.index[mask]]
     assert not ('time' in s.index) and not ('yaw' in s.index) # only sin, cos and deg, should not include time and yaw
@@ -86,7 +86,7 @@ def class_to_name(object):
 
 if __name__ == "__main__":
     today = datetime.datetime.utcnow().date()
-    parser = argparse.ArgumentParser(description='Do a linear regression on a sample of the sky over N days to predict the time of day.')
+    parser = argparse.ArgumentParser(description='Train a linear regression on the sky and evaluate the resulting model.')
     parser.add_argument('--training', help="training dataset csv file path")
     parser.add_argument('--date', help="start date for training data generation")
     parser.add_argument('--days', type=int, default=1, help="number of days to run for (1 is default, means just the date)")

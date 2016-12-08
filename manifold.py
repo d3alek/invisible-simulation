@@ -60,9 +60,6 @@ for yaw_num, yaw in enumerate(yaw_range):
 
 names = angles.T.index
 
-#angles_degrees = angles.T
-#angles_degrees[degrees.T<const] = 0
-#angles_degrees = preprocessing.scale(angles_degrees)
 angles_degrees = preprocessing.scale(angles.append(degrees).T)
 
 angles = preprocessing.scale(angles.T)

@@ -8,9 +8,15 @@ this means we have two coordinates:
 
 import numpy as np
 from geometry import PolarPoint, unit_vector, angle_between, to_cartesian, rotate_yaw
+from sun_calculator import sun_position
 
 class SkyModelGenerator:
     zenith = PolarPoint(np.pi/2, 0)
+
+    @classmethod
+    def for_time_and_place(cls, time, place, yaw=0):
+        obj = cls(sun_position(time, place), yaw)
+        return obj
 
     def __init__(self, sun_position, yaw=0, max_degree=0.8):
         """ Contains the logic for calculating angle of polarization, degree of polarization 
@@ -22,7 +28,7 @@ class SkyModelGenerator:
             max_degree - the maximum degree of polarization, in theory 1 but in nature observed no more than 0.8 (default)
 
         Use:
-            As it is a generator, intended use is to call the generate method passing an instance of Viewer
+            As it is a generator, call the generate method passing an instance of Viewer
         """
         self.max_degree = max_degree
         self.yaw = yaw
@@ -56,21 +62,28 @@ class SkyModelGenerator:
     def get_angle(self, polar_point):
         cartesian_sun, cartesian_zenith, cartesian_observed = [*map(to_cartesian, [self.sun, self.zenith, polar_point])]
 
+        # We get the vector perpendicular to the scattering plane formed by the observer, the zenith and the sun
         angle_vector = self.get_angle_vector(polar_point)
+        # Get the normal of a vertical plane that goes through the zenith and the observed point
         vertical_plane_normal = np.cross(cartesian_zenith, cartesian_observed)
+        # Calculate the angle from the observer's perspective by taking the angle between the vertical plane normal (acting as X axis) and the angle vector
         angle = angle_between(vertical_plane_normal, angle_vector) % (np.pi)
+        # Take the reminder of division by pi as in reality we cannot distinguish whether angle is alpha or alpha+pi
          
         #TODO understand why this is necessary
         if self.is_left_of_the_sun_antisun_split(polar_point):
-            angle = np.pi-angle
+            angle = np.pi - angle
 
         return angle
     
-    # useful for 3d plotting
     def get_angle_vector(self, polar_point):
+        """ The vector perpendicular to the scattering plane formed by the observer, the zenith and the sun """
         cartesian_sun, cartesian_observed = [*map(to_cartesian, [self.sun, polar_point])]
         orthogonal = np.cross(cartesian_sun, cartesian_observed)
-        if np.isclose(np.linalg.norm(orthogonal), 0):
+
+        # If vector lenght is close to 0, assume vector is horizontal. 
+        # This happens when the sun is at the zenith.
+        if np.isclose(np.linalg.norm(orthogonal), 0): 
             return (1, 0, 0)
 
         return orthogonal
@@ -156,7 +169,7 @@ def test_sunset_sunrise():
     sunrise_angles = SkyModelGenerator(sun_position(sunrise)).generate(observed_polar).angles.flatten()
 
     for yaw in range(0, 360, 1):
-        sunset_angles = SkyModelGenerator(sun_position(sunset), yaw=np.deg2rad(yaw)).generate(observed_polar=viewers.uniform_viewer()).angles.flatten()
+        sunset_angles = SkyModelGenerator(sun_position(sunset), yaw=np.deg2rad(yaw)).generate(viewers.uniform_viewer()).angles.flatten()
         diff = np.median((sunset_angles - sunrise_angles) % np.pi)
         if diff < 0.1:
             print("Sunset looks like sunrise when we yaw %s degrees" % yaw)
