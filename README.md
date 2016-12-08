@@ -48,6 +48,10 @@ Generating skies for 85 datetimes starting at 2016-05-01 06:00:00 and ending at 
 3060 skies in total
 ...
 Stored data as csv: skies/160501-sevilla-1-10min-10.csv
+
+$ python sky_generator.py 160501 --days=1 --hours=8 --hours=10 --hours=12 --hours=14 --hours=16 --hours=18 --yaw-step=10
+...
+Stored data as csv: skies/160501-sevilla-1-8-10-12-14-16-18-10.csv
 ```
 
 # Prediction
