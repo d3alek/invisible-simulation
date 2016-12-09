@@ -1,4 +1,11 @@
-# Automated verification of the model
+# Requirements
+- numpy
+- pysolar (for sun position calculation)
+- pandas (for sky generator and yaw predictor)
+- matplotlib (for visualization)
+- behave (for running behavioural tests)
+
+# Verification of the model
 
 ```
 $ python features/sky_model.py 
@@ -75,7 +82,7 @@ optional arguments:
   --polar               produce polar plot
   --use-time            use time as a feature
   --lowest-rank LOWEST_RANK
-                        use feature ranking (comes out of another script). 0
+                        use feature ranking (comes out of yaw_feature_selection.py). 0
                         disables it (default), 1 means use only features
                         ranked 1, etc.
 ```
