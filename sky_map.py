@@ -128,9 +128,9 @@ def draw_intensity(sky_model_generator):
     sky_model = sky_model_generator.generate(viewer=viewers.uniform_viewer())#viewers.vertical_strip_viewer())
     intensities = sky_model.intensities
     white = np.array([[255,255,255]]*len(intensities)) # TODO do it black white
-    #colors = , normalize(intensities))
+    colors = np.array([*map(lambda csi: csi[0]*csi[1], zip(white, normalize(intensities)/255))])
     for (altitude, azimuth), color in zip(sky_model.observed_points, colors):
-        pygame.draw.circle(windowSurfaceObj, 255*color, cartesian2d((altitude, azimuth)), 10, 0)
+        pygame.draw.circle(windowSurfaceObj, color, cartesian2d((altitude, azimuth)), 10, 0)
 
 if len(sys.argv) > 1:
     when = datetime.datetime.strptime(sys.argv[1], "%y%m%d")
@@ -149,9 +149,9 @@ mouse_down = False
 
 def print_angle_and_degree_at(sky_map_coordinates, yaw):
     observed = polar(sky_map_coordinates)
-    sky_model_generator = SkyModelGenerator(sun_at, yaw=yaw)
-    sky_model_local_observed = PolarPoint.from_tuple(observed)
-    print("Observed: %s Angle: %f Degree %f" % ([*map(np.rad2deg, sky_model_local_observed)], np.rad2deg(sky_model_generator.get_angle(sky_model_local_observed)), sky_model_generator.get_degree(sky_model_local_observed)))
+    smg = SkyModelGenerator(sun_at, yaw=yaw)
+    observed_point = PolarPoint.from_tuple(observed)
+    print("Observed: %s Angle: %f Degree %f Intensity: %f" % ([*map(np.rad2deg, observed_point)], np.rad2deg(smg.get_angle(observed_point)), smg.get_degree(observed_point), smg.get_intensity(observed_point)))
 
 def normalize(array):
     return ((-array.min() + array) * (255/(-array.min() + array.max()))).astype(int)

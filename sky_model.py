@@ -135,7 +135,8 @@ class SkyModelGenerator:
         else:
             return rotate_yaw(polar, -self.yaw)
 
-    # Table 1 from Perez et al, 4th data group, first row. Why? Just testing...
+    # Table 1 from Perez et al, 4th data group, first row. Consult Perez et al 1993 for the effect of each parameter and suggested values
+    #TODO Why choose these? Maybe change them to something Sevilla specific...
     clear_sky_parameters = (-1.4366, -0.1233, 1, 0.2809, 0.9938)
 
     def get_relative_luminance(self, zenith_angle, gamma):
