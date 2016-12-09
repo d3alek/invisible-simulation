@@ -165,13 +165,14 @@ def draw_predictors(polar_ranks, rank_at_most):
         pygame.draw.circle(windowSurfaceObj, 255*(1-color), cartesian2d(polar), 10, 0)
 
 def add_polar_coordinates(ranks):
+    """ Makes the implicit assumption that the used viewer was uniform viewer """
     l = len(ranks)
     angle_sin_ranks = ranks[:l/3]
     angle_cos_ranks = ranks[l/3:2*l/3]
     degree_ranks = ranks[2*l/3:]
     assert len(angle_sin_ranks) == len(angle_cos_ranks) and len(degree_ranks) == len(angle_cos_ranks)
 
-    polar_coordinates = viewers.uniform_viewer()
+    polar_coordinates = viewers.uniform_viewer().get_observed_points()
 
     return {"degree": np.array([*zip(polar_coordinates, degree_ranks)]), 
             "angle-sin": np.array([*zip(polar_coordinates, angle_sin_ranks)]), 
@@ -183,7 +184,24 @@ def print_statusbar(string):
     rect = renderedFont.get_rect(center=(WIDTH/2, HEIGHT-10))
     windowSurfaceObj.blit(renderedFont, rect)
 
+def print_help():
+    print("An interactive visualization of the polarized sky")
+    print("Drag mouse right and left to move the sun from sunrise to sunset and back")
+    print("Hit escape to exit")
+    print("Other commands:")
+    print(" A click at a point tells you detailed information about the parameters of the sky at that point")
+    print(" i shows the intensity distribution of the sky")
+    print(" left and right keyboard keys simulate the agent rotating on the spot. Observe the red arrow that always points north.")
+    print(" p turns predictor display on, showing how useful the sampled points of the sky are. Brighter is higher")
+    print("   d shows degree of polarization features ranking")
+    print("   s shows polarization angle sin features ranking")
+    print("   a shows polarizaiton angle cos features ranking")
+    print("   c uses ranking for yaw cos prediction")
+    print("   v uses ranking for yaw sin prediction")
+    print("   keys 1-4 show the top [1, 20, 100, 1000] features")
 if __name__ == "__main__":
+    print_help()
+
     import doctest
     doctest.testmod()
 
@@ -240,13 +258,10 @@ if __name__ == "__main__":
 
                 if event.key == K_d:
                     show_predictors_key = "degree"
-                    print("Show degree predictors")
                 if event.key == K_s:
                     show_predictors_key = "angle-sin"
-                    print("Show angle sin predictors")
                 if event.key == K_a:
                     show_predictors_key = "angle-cos"
-                    print("Show angle cos predictors")
 
                 if event.key == K_1:
                     rank_at_most = 1

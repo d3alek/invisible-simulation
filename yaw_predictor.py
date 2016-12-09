@@ -80,7 +80,7 @@ if __name__ == "__main__":
     parser.add_argument('test', help="test dataset csv file path")
     parser.add_argument('--polar', action="store_true", help='produce polar plot')
     parser.add_argument('--use-time', action="store_true", help='use time as a feature')
-    parser.add_argument('--lowest-rank', type=int, default=0, help='use feature ranking (comes out of another script). 0 disables it (default), 1 means use only features ranked 1, etc.')
+    parser.add_argument('--lowest-rank', type=int, default=0, help='use feature ranking (the result of yaw feature selector). 0 disables it (default), 1 means use only features ranked 1, etc.')
 
     args = parser.parse_args()
 
@@ -92,19 +92,21 @@ if __name__ == "__main__":
     training_data = pd.read_csv(training_file, index_col=0, parse_dates=True)
     test_data = pd.read_csv(test_file, index_col=0, parse_dates=True)
 
-    # TODO refactor this, maybe need to crop test as well as training
-    #if lowest_rank > 0:
-    #    features_sin_rank_file = 'data/rfe_sin.pickle'
-    #    features_cos_rank_file = 'data/rfe_cos.pickle'
-    #    ranking_sin = np.append(pickle.load(open(features_sin_rank_file, 'rb')).ranking_, [1,1]) # to preserve the last 2 columns, time and yaw
-    #    ranking_cos = np.append(pickle.load(open(features_cos_rank_file, 'rb')).ranking_, [1,1]) # to preserve the last 2 columns, time and yaw
-    #    mask = np.ma.mask_or(ranking_sin <= lowest_rank, ranking_cos <= lowest_rank)
-    #    data = data[np.arange(data.columns.size)[mask]]
-    #    print("Only using features ranked <= %d so %d features selected" % (lowest_rank, data.columns.size - 2))
-    #    mask = mask[:-2] # to remove the last 2 columns leaving only features in mask
-    #else:
-    #    mask = np.full(data.columns.size - 2, True, dtype=bool) # to remove the last 2 columns, leaving only features in mask
-    mask = np.full(training_data.columns.size - 2, True, dtype=bool) # to remove the last 2 columns, leaving only features in mask
+    features_count = training_data.columns.size 
+
+    if lowest_rank > 0:
+        features_sin_rank_file = 'data/rfe_sin.pickle'
+        features_cos_rank_file = 'data/rfe_cos.pickle'
+        ranking_sin = np.append(pickle.load(open(features_sin_rank_file, 'rb')).ranking_, [1,1]) # to preserve the last 2 columns, time and yaw
+        ranking_cos = np.append(pickle.load(open(features_cos_rank_file, 'rb')).ranking_, [1,1]) # to preserve the last 2 columns, time and yaw
+        # Create a mask with False when both sin and cos rankings are more than than the given lowest_rank
+        mask = np.ma.mask_or(ranking_sin <= lowest_rank, ranking_cos <= lowest_rank)
+        training_data = training_data[np.arange(features_count)[mask]]
+        print("Only using features ranked <= %d so %d features selected" % (lowest_rank, features_count - 2))
+
+        mask = mask[:-2] # remove last 2 columns which are time and yaw
+    else:
+        mask = np.full(features_count - 2, True, dtype=bool) # remove last 2 columns which are time and yaw
 
     reg = linear_model.Ridge(alpha=1000)
     reg.fit(parse_X(training_data), parse_y(training_data))

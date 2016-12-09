@@ -88,3 +88,26 @@ Saved figure to graphs/Ridge_on_training[160501-sevilla-1-10min-10]_test[160501-
 ```
 ![Ridge_on_training[160501-sevilla-1-10min-10]_test[160501-sevilla-1-8-10-12-14-16-18-10]_polar_972_features.png](graphs/example.png)
 
+# Feature selection
+
+```
+$ python yaw_feature_selection.py skies/160501-sevilla-1-10min-10.csv
+... wait for  hours ...
+Saved pickled rfe_sin and rfe_cos in data directory
+```
+
+Two rankings are produced because the yaw is divided in sin and cos to model its cycliclty. 
+Read the pickled objects's ranking_ parameter to see for a list of ranks where 1 is best rank.
+
+```
+$ python yaw_predictor.py skies/160501-sevilla-1-10min-10.csv skies/160501-sevilla-1-8-10-12-14-16-18-10.csv --polar --lowest-rank=1
+... should produce worse predictions using only the features ranked 1 ...
+
+$ python sky_map
+```
+
+Press P to see degree ranking with colors (lighter is lower rank, better ranked).
+Press S to see ranking of the sin component of the angle features.
+Press C to see the yaw cos predictor ranking.
+Press 1 to see the features ranked 1, 2 to see the features with rank <=20 and so on.
+```
