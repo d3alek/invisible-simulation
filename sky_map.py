@@ -10,7 +10,6 @@ from sky_model import SkyModelGenerator
 from geometry import PolarPoint
 import numpy as np
 from pygame.locals import *
-import ipdb
 
 import datetime
 from sun_calculator import sunrise_sunset, sun_position
@@ -18,6 +17,9 @@ from sun_calculator import sunrise_sunset, sun_position
 import viewers
 
 import matplotlib.pyplot as plt
+from os.path import isfile
+
+import pickle
 
 pygame.init()
 fpsClock = pygame.time.Clock()
@@ -41,6 +43,11 @@ redColor = pygame.Color(255, 0, 0)
 yellowColor = pygame.Color(255, 255, 0)
 
 sun_at = EAST
+
+STATE_ANGLE_DEGREES = "state-angle-degrees"
+STATE_FEATURE_RANKS = "state-feature-ranks"
+STATE_INTENSITY = "state-intensity"
+states = [STATE_ANGLE_DEGREES, STATE_FEATURE_RANKS, STATE_INTENSITY]
 
 def polar(sky_map_coordinates):
     """Opposite of cartesian2d. For some reason this doctest does not execute
@@ -118,19 +125,23 @@ def draw_north(yaw_degrees):
     windowSurfaceObj.blit(rotated_rendered_font, rect)
 
 def draw_angles(sky_model_generator):
-    sky_model = sky_model_generator.generate(viewer=viewers.uniform_viewer())#viewers.vertical_strip_viewer())
+    sky_model = sky_model_generator.generate(viewer=viewers.uniform_viewer())
     for index, (altitude, azimuth) in enumerate(sky_model.observed_points):
         angle = sky_model.angles[index]
         degree = sky_model.degrees[index]
         draw_angle_arrow(angle, (altitude, azimuth), sky_model.yaw, int(1+5*degree))
 
+def normalize(array):
+    return ((-array.min() + array) * (255/(-array.min() + array.max()))).astype(int)
+
 def draw_intensity(sky_model_generator):
-    sky_model = sky_model_generator.generate(viewer=viewers.uniform_viewer())#viewers.vertical_strip_viewer())
+    sky_model = sky_model_generator.generate(viewer=viewers.uniform_viewer())
     intensities = sky_model.intensities
-    white = np.array([[255,255,255]]*len(intensities)) # TODO do it black white
-    colors = np.array([*map(lambda csi: csi[0]*csi[1], zip(white, normalize(intensities)/255))])
+    normalized = normalize(intensities)
+    colors = plt.cm.gray(normalized)
+
     for (altitude, azimuth), color in zip(sky_model.observed_points, colors):
-        pygame.draw.circle(windowSurfaceObj, color, cartesian2d((altitude, azimuth)), 10, 0)
+        pygame.draw.circle(windowSurfaceObj, 255*color, cartesian2d((altitude, azimuth)), 10, 0)
 
 if len(sys.argv) > 1:
     when = datetime.datetime.strptime(sys.argv[1], "%y%m%d")
@@ -153,30 +164,25 @@ def print_angle_and_degree_at(sky_map_coordinates, yaw):
     observed_point = PolarPoint.from_tuple(observed)
     print("Observed: %s Angle: %f Degree %f Intensity: %f" % ([*map(np.rad2deg, observed_point)], np.rad2deg(smg.get_angle(observed_point)), smg.get_degree(observed_point), smg.get_intensity(observed_point)))
 
-def normalize(array):
-    return ((-array.min() + array) * (255/(-array.min() + array.max()))).astype(int)
+def draw_feature_ranks(polar_ranks):
+    if polar_ranks.size == 0:
+        return
 
-def draw_predictors(polar_ranks, rank_at_most):
     normalized = normalize(polar_ranks[:,1].astype(int))
-    m = normalized.max()
-    normalized[polar_ranks[:,1] > rank_at_most] = m
-    colors = plt.cm.cubehelix(normalized)
+    colors = plt.cm.gray(normalized)
     for polar, parameter, color in zip(polar_ranks[:,0], polar_ranks[:,1], colors):
         pygame.draw.circle(windowSurfaceObj, 255*(1-color), cartesian2d(polar), 10, 0)
 
-def add_polar_coordinates(ranks):
-    """ Makes the implicit assumption that the used viewer was uniform viewer """
+def split_into_feature_types(ranks):
     l = len(ranks)
     angle_sin_ranks = ranks[:l/3]
     angle_cos_ranks = ranks[l/3:2*l/3]
     degree_ranks = ranks[2*l/3:]
     assert len(angle_sin_ranks) == len(angle_cos_ranks) and len(degree_ranks) == len(angle_cos_ranks)
 
-    polar_coordinates = viewers.uniform_viewer().get_observed_points()
-
-    return {"degree": np.array([*zip(polar_coordinates, degree_ranks)]), 
-            "angle-sin": np.array([*zip(polar_coordinates, angle_sin_ranks)]), 
-            "angle-cos": np.array([*zip(polar_coordinates, angle_cos_ranks)])}
+    return {"degree": degree_ranks,
+            "angle-sin": angle_sin_ranks, 
+            "angle-cos": angle_cos_ranks}
 
 def print_statusbar(string):
     fontObj = pygame.font.Font(FONT_TTF, 20)
@@ -205,16 +211,15 @@ if __name__ == "__main__":
     import doctest
     doctest.testmod()
 
-    show_predictors = False
-    show_degree_predictors = False
 
     yaw = 0
 
     rank_at_most = 1000
-    show_intensity = False
-
-    show_predictors_key = "degree"
-    features_rank = []
+    state = states[0]
+    feature_rank_files = {
+            "sin" : "data/rfe_sin.pickle",
+            "cos": "data/rfe_cos.pickle"
+            }
 
     while True:
         windowSurfaceObj.fill(blackColor)
@@ -239,44 +244,42 @@ if __name__ == "__main__":
 
             elif event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
-                    pygame.event.post(pygame.event.Event(QUIT))
-                if event.key == K_p:
-                    show_predictors = not show_predictors
-                    if not features_rank:
-                        import pickle
-                        features_rank_file = 'data/rfe_sin.pickle'
-                        features_rank = add_polar_coordinates(pickle.load(open(features_rank_file, 'rb')).ranking_)
+                    if state == state[0]:
+                        pygame.event.post(pygame.event.Event(QUIT))
+                    else:
+                        state = state[0]
 
-                if event.key == K_c:
-                    import pickle
-                    features_rank_file = 'data/rfe_cos.pickle'
-                    features_rank = add_polar_coordinates(pickle.load(open(features_rank_file, 'rb')).ranking_)
-                if event.key == K_v:
-                    import pickle
-                    features_rank_file = 'data/rfe_sin.pickle'
-                    features_rank = add_polar_coordinates(pickle.load(open(features_rank_file, 'rb')).ranking_)
+                elif event.key == K_p:
+                    if isfile(feature_rank_files['sin']) and isfile(feature_rank_files['cos']):
+                        state = STATE_FEATURE_RANKS
+                        ranking_yaw_component = 'sin'
+                        ranking_feature_type = "angle-sin"
+                    else:
+                        print("At least one of %s does not exist. Please run yaw_feature_predictor.py to generate the files" % feature_rank_files.values())
 
-                if event.key == K_d:
-                    show_predictors_key = "degree"
-                if event.key == K_s:
-                    show_predictors_key = "angle-sin"
-                if event.key == K_a:
-                    show_predictors_key = "angle-cos"
+                elif state == STATE_FEATURE_RANKS:
+                    if event.key == K_c:
+                        ranking_yaw_component = 'cos'
+                    elif event.key == K_v:
+                        ranking_yaw_component = 'sin'
+                    elif event.key == K_d:
+                        ranking_feature_type = "degree"
+                    elif event.key == K_s:
+                        ranking_feature_type = "angle-sin"
+                    elif event.key == K_a:
+                        ranking_feature_type = "angle-cos"
 
-                if event.key == K_1:
-                    rank_at_most = 1
-
-                if event.key == K_2:
-                    rank_at_most = 20
-
-                if event.key == K_3:
-                    rank_at_most = 100
-
-                if event.key == K_4:
-                    rank_at_most = 1000
+                    elif event.key == K_1:
+                        rank_at_most = 1
+                    elif event.key == K_2:
+                        rank_at_most = 20
+                    elif event.key == K_3:
+                        rank_at_most = 100
+                    elif event.key == K_4:
+                        rank_at_most = 1000
 
                 if event.key == K_i:
-                    show_intensity = not show_intensity
+                    state = STATE_INTENSITY
 
                 if event.key == K_LEFT:
                     yaw += 10
@@ -285,15 +288,28 @@ if __name__ == "__main__":
 
         sky_model_generator = SkyModelGenerator(sun_at, yaw=np.deg2rad(yaw))
 
-        if show_intensity:
+        if state == STATE_INTENSITY:
             draw_intensity(sky_model_generator)
 
         else:
             draw_angles(sky_model_generator)
 
-            if show_predictors:
-                draw_predictors(features_rank[show_predictors_key], rank_at_most)
-                print_statusbar(" ".join([str(rank_at_most), features_rank_file, show_predictors_key]))
+            if state == STATE_FEATURE_RANKS:
+                ranking = pickle.load(open(feature_rank_files[ranking_yaw_component], 'rb')).ranking_
+
+                ranked_feature_types = split_into_feature_types(ranking)
+
+                ranked = ranked_feature_types[ranking_feature_type]
+                observed_points = np.array(viewers.uniform_viewer().get_observed_points())
+                assert len(ranked) == len(observed_points), "Ranking has different number of features that the uniform viewer, expected %d got %d" % (len(observed_points), len(ranked))
+
+                ranked_trimmed = ranked[ranked <= rank_at_most]
+                observed_points_trimmed = observed_points[ranked <= rank_at_most]
+
+                rank_coordinates = np.array([*zip(observed_points_trimmed, ranked_trimmed)])
+
+                draw_feature_ranks(rank_coordinates)
+                print_statusbar("Showing top %d %s features that predict yaw %s component" % (rank_at_most, ranking_feature_type, ranking_yaw_component))
 
         draw_sun(sky_model_generator, sun_at)
         draw_north(yaw)

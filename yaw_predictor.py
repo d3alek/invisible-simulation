@@ -73,6 +73,10 @@ def class_to_name(object):
 def file_name(file_path):
     return file_path.split('/')[-1].split('.')[0]
 
+def determine_yaws_per_time(data):
+    first_time = ' '.join(data.index[0].split(' ')[0:2])
+    return test_data[data.time==first_time].shape[0]
+
 if __name__ == "__main__":
     today = datetime.datetime.utcnow().date()
     parser = argparse.ArgumentParser(description='Train a linear regression on the sky and evaluate the resulting model.')
@@ -99,7 +103,7 @@ if __name__ == "__main__":
         features_cos_rank_file = 'data/rfe_cos.pickle'
         ranking_sin = np.append(pickle.load(open(features_sin_rank_file, 'rb')).ranking_, [1,1]) # to preserve the last 2 columns, time and yaw
         ranking_cos = np.append(pickle.load(open(features_cos_rank_file, 'rb')).ranking_, [1,1]) # to preserve the last 2 columns, time and yaw
-        # Create a mask with False when both sin and cos rankings are more than than the given lowest_rank
+        # Create a mask with False when both sin and cos rankings are bigger than than the given lowest_rank
         mask = np.ma.mask_or(ranking_sin <= lowest_rank, ranking_cos <= lowest_rank)
         training_data = training_data[np.arange(features_count)[mask]]
         print("Only using features ranked <= %d so %d features selected" % (lowest_rank, features_count - 2))
@@ -107,17 +111,19 @@ if __name__ == "__main__":
         mask = mask[:-2] # remove last 2 columns which are time and yaw
     else:
         mask = np.full(features_count - 2, True, dtype=bool) # remove last 2 columns which are time and yaw
+    # TODO removing time and yaw with mask as above, just because you know that they are the last two elements is ugly and error-prone. Think of a better way
+    # While you're there allow for incluson of time as a feature binary - 0, 1 for morning afternoon
+    # if you later want to use millis you need to scale it otherwise learning won't work
 
-    reg = linear_model.Ridge(alpha=1000)
+    yaws_per_time = determine_yaws_per_time(test_data) 
+    times_number = test_data.shape[0] / yaws_per_time 
+    assert times_number in figure_rows_cols.keys(), "Cannot visualize that many plots. %d times in testing data, can show at most %d" % (times_number, max(figure_rows_cols.keys()))
+    rows, cols = figure_rows_cols[times_number]
+
+    reg = linear_model.Ridge(alpha=1000) # Alpha was determined by running RidgeCV
     reg.fit(parse_X(training_data), parse_y(training_data))
 
     print(reg)
-
-    first_time = ' '.join(test_data.index[0].split(' ')[0:2])
-    yaws_for_a_time = test_data[test_data.time==first_time].shape[0]
-
-    plots = test_data.shape[0] / yaws_for_a_time
-    rows, cols = figure_rows_cols[plots]
 
     if polar:
         fig, axes = plt.subplots(subplot_kw=dict(polar=True, axisbg='none'), nrows=rows, ncols=cols)

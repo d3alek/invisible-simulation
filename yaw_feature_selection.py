@@ -24,28 +24,28 @@ def parse_y(data, component=1):
     yaws = data['yaw']
     return np.array([*map(sky_generator.angle_to_scalar, yaws.values)])[:,component]
 
-def class_to_name(object):
-    return str(object).split('(')[0]
-
 if __name__ == "__main__":
     today = datetime.datetime.utcnow().date()
     parser = argparse.ArgumentParser(description='Train a model and run feature ranking with recursive' +
             ' feature elimination and cross-validated selection (RFECV) of the best number of features')
     parser.add_argument('training', help="training dataset csv file path")
+    parser.add_argument('--parallel', action="store_true", help="parallelize the computation over all available cores. Known to crash on Bena's macbook")
 
     args = parser.parse_args()
 
     training_file = args.training
+    parallel = args.parallel
+    jobs = -1 if parallel else 1
 
     data = pd.read_csv(training_file, index_col=0, parse_dates=True)
 
     reg_sin = linear_model.Ridge(alpha=1000)
-    rfe_sin = feature_selection.RFECV(estimator=reg_sin, verbose=True, n_jobs=-1)
+    rfe_sin = feature_selection.RFECV(estimator=reg_sin, n_jobs=jobs)
     rfe_sin.fit(parse_X(data), parse_y(data, 0))
     pickle.dump(rfe_sin, open('data/rfe_sin.pickle', 'wb'))
 
     reg_cos = linear_model.Ridge(alpha=1000)
-    rfe_cos = feature_selection.RFECV(estimator=reg_cos, verbose=True, n_jobs=-1)
+    rfe_cos = feature_selection.RFECV(estimator=reg_cos, n_jobs=jobs)
     rfe_cos.fit(parse_X(data), parse_y(data, 1))
     pickle.dump(rfe_cos, open('data/rfe_cos.pickle', 'wb'))
 

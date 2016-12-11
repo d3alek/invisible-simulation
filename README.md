@@ -1,15 +1,22 @@
 # Requirements
+- python3
 - numpy
 - pysolar (for sun position calculation)
 - pandas (for sky generator and yaw predictor)
+- sklearn (for yaw predictors)
+- scipy (for yaw predictor)
+- pygame (for sky_map)
 - matplotlib (for visualization)
 - behave (for running behavioural tests)
+- ipdb (for interractive debugging, only used if the behavioural tests go bad)
 
 # Verification of the model
 
-```
-$ python features/sky_model.py 
-... no output here means all fine ...
+$ python geometry.py
+... no output means all doctests passed ...```
+$ python sky_model.py 
+Sunset looks like sunrise
+
 $ behave
 ... you expect no failed tests ...
 $ python sky_dome_3d.py
@@ -60,6 +67,7 @@ Generating skies for 85 datetimes starting at 2016-05-01 06:00:00 and ending at 
 Stored data as csv: skies/160501-sevilla-1-10min-10.csv
 
 $ python sky_generator.py 160501 --days=1 --hours=8 --hours=10 --hours=12 --hours=14 --hours=16 --hours=18 --yaw-step=10
+( equivalent result can be acheived by doing python sky_generator.py 160501 --days=1 --start=8 --end=18 --freq=2H --yaw-step=10 )
 ...
 Stored data as csv: skies/160501-sevilla-1-8-10-12-14-16-18-10.csv
 ```
@@ -96,7 +104,7 @@ Saved figure to graphs/Ridge_on_training[160501-sevilla-1-10min-10]_test[160501-
 ![Ridge_on_training[160501-sevilla-1-10min-10]_test[160501-sevilla-1-8-10-12-14-16-18-10]_polar_972_features.png](graphs/example.png)
 
 # Feature selection
-
+Passing the --parallel argument is recommended because computation takes a lot of time. However, it is known to crash the feature selection on Bena's macbook.
 ```
 $ python yaw_feature_selection.py skies/160501-sevilla-1-10min-10.csv
 ... wait for  hours ...

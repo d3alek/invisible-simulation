@@ -66,11 +66,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Do a linear regression on a sample of the sky over N days to predict the time of day.')
     parser.add_argument('date', help="start date for training data generation. Format is 160501 for May 1 2016")
     parser.add_argument('--days', metavar='N', type=int, default=1, help='the number of days to gather training data for. Default 1')
-    parser.add_argument('--start', type=int, default=6, help='the number of days to gather training data for. Default 6')
-    parser.add_argument('--end', type=int, default=20, help='the number of days to gather training data for. Default 20')
+    parser.add_argument('--start', type=int, default=6, help='The start time each day. Default 6')
+    parser.add_argument('--end', type=int, default=20, help='The end time each day. Default 20')
     parser.add_argument('--freq', help='Mutually exclusive with --hours. Sample the sky between *start* hour and *end* hour at frequency - 10min, 1H, 1D')
     parser.add_argument('--hours', type=int, action='append',
-                                help='Mutually exclusive with freq. Sample the sky at this hour each day (can be specified multiple times)')
+                                help='Mutually exclusive with --freq. Sample the sky at this hour each day (can be specified multiple times)')
     parser.add_argument('--yaw-step', type=int, default=10, help='rotational step in degrees. Default 10 degrees.')
     available_places = [item for item in dir(places) if not item.startswith("__") and not item in ['Place', 'PolarPoint', 'pytz']] 
     parser.add_argument('--place', default="sevilla", help='place on Earth to simulate the sky for. To add a place, edit places.py. Default sevilla. Available places: %s.' % available_places)

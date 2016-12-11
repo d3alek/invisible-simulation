@@ -1,4 +1,6 @@
 """
+Mostly based on https://en.wikipedia.org/wiki/Rayleigh_sky_model
+
 The sky model is using the horizontal celestrial coordinate system https://en.wikipedia.org/wiki/Horizontal_coordinate_system 
 this means we have two coordinates: 
  - altitude - elevation (0-pi/2)
